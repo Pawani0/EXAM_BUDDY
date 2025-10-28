@@ -1,0 +1,47 @@
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+*.egg
+*.log
+*.coverage
+.coverage.*
+.pytest_cache/
+build/
+dist/
+
+# Python environments
+.env
+.env.*
+.venv/
+venv/
+ENV/
+
+# Node / JavaScript
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local data
+*.sqlite3
