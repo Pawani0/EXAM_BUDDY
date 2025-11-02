@@ -6,8 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus, GraduationCap, Users } from "lucide-react";
 import { toast } from "sonner";
-
-type Role = "student" | "teacher";
+import type { Role } from "@/lib/useAuth";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -15,17 +14,60 @@ const Signup = () => {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!fullName || !email || !password) {
+
+    const trimmedName = fullName.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedName || !trimmedEmail || !password) {
       toast.error("Please fill in all fields");
       return;
     }
 
-    toast.success(`Account created as ${role}! Redirecting...`);
-    setTimeout(() => navigate("/"), 1500);
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters long");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/auth/signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          full_name: trimmedName,
+          email: trimmedEmail,
+          password,
+          role,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const message = errorData?.detail || errorData?.error || "Unable to create your account.";
+        toast.error(message);
+        return;
+      }
+
+      toast.success(`Account created as ${role}! Redirecting...`);
+      setFullName("");
+      setEmail("");
+      setPassword("");
+      setTimeout(() => navigate("/login"), 1500);
+    } catch (error) {
+      console.error("Signup failed", error);
+      toast.error("We couldn't reach the server. Please try again in a moment.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -127,9 +169,10 @@ const Signup = () => {
                 type="submit"
                 size="lg"
                 className="w-full gap-2 bg-primary hover:bg-primary/90"
+                disabled={isLoading}
               >
                 <UserPlus className="h-5 w-5" />
-                Create Account
+                {isLoading ? "Creating..." : "Create Account"}
               </Button>
             </form>
 

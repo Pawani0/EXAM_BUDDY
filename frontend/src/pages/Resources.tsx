@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
 
 type PyqResource = {
   id: number;
@@ -11,57 +13,56 @@ type PyqResource = {
   downloadUrl: string;
 };
 
-// Map allows class/subject specific overrides while keeping a global default.
-const pyqLibrary: Record<string, PyqResource[]> = {
-  "class-1-evs": [
-    {
-      id: 1,
-      title: "Class 1 EVS PYQ 2023",
-      year: "2023",
-      embedUrl: "https://drive.google.com/file/d/1Bv8dZ-HmExamplePreviewId/preview",
-      downloadUrl: "https://drive.google.com/file/d/1Bv8dZ-HmExampleDownloadId/view?usp=sharing",
-    },
-    {
-      id: 2,
-      title: "Class 1 EVS PYQ 2022",
-      year: "2022",
-      embedUrl: "",
-      downloadUrl: "",
-    },
-  ],
-  "class-7-mathematics": [
-    {
-      id: 1,
-      title: "Class 7 Mathematics PYQ 2023",
-      year: "2023",
-      embedUrl: "https://drive.google.com/file/d/1Bv8dZ-HmExamplePreviewId/preview",
-      downloadUrl: "https://drive.google.com/file/d/1Bv8dZ-HmExampleDownloadId/view?usp=sharing",
-    },
-    {
-      id: 2,
-      title: "Class 7 Mathematics PYQ 2022",
-      year: "2022",
-      embedUrl: "",
-      downloadUrl: "",
-    },
-  ],
-};
-
-const sampleSyllabi: Record<string, string> = {
-  "class-7-mathematics": "https://drive.google.com/uc?export=download&id=YOUR_FILE_ID",
-};
-
 export default function Resources() {
   const { classId, subject } = useParams();
   const navigate = useNavigate();
-  const subjectSlug = subject?.toLowerCase().replace(/\s+/g, "-") || "";
-  const syllabusKey = `${classId}-${subjectSlug}`;
-  const syllabusUrl = sampleSyllabi[syllabusKey] || "";
-  const selectedPyqs =
-    (classId && pyqLibrary[`${classId}-${subjectSlug}`]) ||
-    (classId && pyqLibrary[classId]) ||
-    pyqLibrary.default ||
-    [];
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+  
+  const [pyqs, setPyqs] = useState<PyqResource[]>([]);
+  const [syllabusUrl, setSyllabusUrl] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [subjectName, setSubjectName] = useState<string>("");
+
+  useEffect(() => {
+    if (classId && subject) {
+      loadResources(classId, subject);
+    }
+  }, [classId, subject]);
+
+  const loadResources = async (clsId: string, subjectSlug: string) => {
+    try {
+      setLoading(true);
+      
+      // First, find the subject by slug
+      const subjectRes = await fetch(`${apiBaseUrl}/api/classes/${clsId}/subjects/${subjectSlug}`);
+      if (!subjectRes.ok) {
+        toast.error("Subject not found");
+        setLoading(false);
+        return;
+      }
+      
+      const subjectData = await subjectRes.json();
+      setSubjectName(subjectData.name);
+      
+      // Fetch PYQs
+      const pyqRes = await fetch(`${apiBaseUrl}/api/subjects/${subjectData.id}/materials?material_type=pyq`);
+      if (pyqRes.ok) {
+        const pyqData = await pyqRes.json();
+        setPyqs(pyqData.pyqs || []);
+      }
+      
+      // Fetch Syllabus
+      const syllabusRes = await fetch(`${apiBaseUrl}/api/subjects/${subjectData.id}/materials?material_type=syllabus`);
+      if (syllabusRes.ok) {
+        const syllabusData = await syllabusRes.json();
+        setSyllabusUrl(syllabusData.syllabusUrl || "");
+      }
+    } catch (error) {
+      toast.error("Failed to load resources");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen p-6">
@@ -78,7 +79,7 @@ export default function Resources() {
           </Button>
           <div>
             <h1 className="text-4xl font-bold gradient-text">
-              {subject?.replace(/-/g, " ").toUpperCase()} Resources
+              {subjectName || subject?.replace(/-/g, " ").toUpperCase() || "Subject"} Resources
             </h1>
             <p className="text-muted-foreground mt-2">
               Previous Year Question Papers
@@ -104,7 +105,12 @@ export default function Resources() {
               </Button>
             )}
           </div>
-          {selectedPyqs.map((pyq, index) => (
+          {loading ? (
+            <Card className="glass-card p-12 text-center">
+              <p className="text-muted-foreground">Loading resources...</p>
+            </Card>
+          ) : pyqs.length > 0 ? (
+            pyqs.map((pyq, index) => (
             <Card
               key={pyq.id}
               className="glass-card p-6 hover-lift animate-scale-in"
@@ -170,21 +176,19 @@ export default function Resources() {
                 )}
               </div>
             </Card>
-          ))}
+          ))
+          ) : (
+            <Card className="glass-card p-12 text-center">
+              <FileText className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-2xl font-semibold text-foreground mb-2">
+                No Resources Available
+              </h3>
+              <p className="text-muted-foreground">
+                PYQ papers will be added soon
+              </p>
+            </Card>
+          )}
         </div>
-
-        {/* Empty State */}
-        {selectedPyqs.length === 0 && (
-          <Card className="glass-card p-12 text-center">
-            <FileText className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-2xl font-semibold text-foreground mb-2">
-              No Resources Available
-            </h3>
-            <p className="text-muted-foreground">
-              PYQ papers will be added soon
-            </p>
-          </Card>
-        )}
       </div>
     </div>
   );

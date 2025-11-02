@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+sqlalchemy>=2.0
+psycopg[binary]
+passlib[bcrypt]
+groq
+sentence-transformers
+scikit-learn
+numpy

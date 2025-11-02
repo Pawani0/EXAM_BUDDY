@@ -1,67 +1,83 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { CategoryCard } from "@/components/CategoryCard";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, School, BookOpen, Building2, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/useAuth";
+import { getIcon } from "@/lib/iconMapper";
 
-const categories = [
-  {
-    id: "primary",
-    title: "Primary",
-    description: "Classes 1-5",
-    icon: School,
-    classes: ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5"],
-  },
-  {
-    id: "middle",
-    title: "Middle School",
-    description: "Classes 6-8",
-    icon: BookOpen,
-    classes: ["Class 6", "Class 7", "Class 8"],
-  },
-  {
-    id: "high",
-    title: "High School",
-    description: "Classes 9-10",
-    icon: BookOpen,
-    classes: ["Class 9", "Class 10"],
-  },
-  {
-    id: "higher",
-    title: "Higher Secondary",
-    description: "Classes 11-12",
-    icon: GraduationCap,
-    classes: ["Class 11", "Class 12"],
-  },
-  {
-    id: "university",
-    title: "Universities",
-    description: "UG/PG Programs",
-    icon: Building2,
-    classes: ["RGPV"],
-  },
-];
+interface Category {
+  id: number;
+  title: string;
+  description?: string | null;
+  icon_name?: string | null;
+  display_order: number;
+  classes: Class[];
+}
+
+interface Class {
+  id: number;
+  category_id: number;
+  name: string;
+  display_order: number;
+}
 
 const Index = () => {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user, clearUser } = useAuth();
+  const isLoggedIn = Boolean(user);
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
-  const handleCategoryClick = (categoryId: string) => {
-    setSelectedCategory(categoryId);
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/categories`);
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+      } else {
+        toast.error("Failed to load categories");
+      }
+    } catch (error) {
+      toast.error("Failed to load categories");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCategoryClick = (category: Category) => {
+    setSelectedCategory(category);
     toast.success("Category selected! Choose your class below.");
   };
 
-  const handleClassClick = (className: string) => {
-    navigate(`/class/${className.toLowerCase().replace(/\s+/g, "-")}`);
+  const handleClassClick = (classId: number, className: string) => {
+    navigate(`/class/${classId}/${className.toLowerCase().replace(/\s+/g, "-")}`);
+  };
+
+  const handleLogout = () => {
+    clearUser();
+    toast.success("You have been logged out.");
+    navigate("/login");
   };
 
   const selectedCategoryData = categories.find((cat) => cat.id === selectedCategory);
 
   return (
     <div className="min-h-screen">
-      <Header showAuth />
+      <Header
+        showAuth={!isLoggedIn}
+        showStudentActions={isLoggedIn}
+        studentActionVariant="dashboard"
+        onLogout={handleLogout}
+      />
 
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-6 py-16 animate-fade-in">
@@ -107,38 +123,46 @@ const Index = () => {
           <p className="text-xl text-muted-foreground">Select your category to access relevant study materials</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {categories.map((category, index) => (
-            <CategoryCard
-              key={category.id}
-              title={category.title}
-              description={category.description}
-              icon={category.icon}
-              onClick={() => handleCategoryClick(category.id)}
-              delay={index * 100}
-            />
-          ))}
-        </div>
-
-        {/* Classes Selection */}
-        {selectedCategoryData && (
-          <div className="glass-card rounded-3xl p-8 animate-slide-up">
-            <h3 className="text-2xl font-bold text-foreground mb-6">
-              Select Your Class - {selectedCategoryData.title}
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {selectedCategoryData.classes.map((className) => (
-                <Button
-                  key={className}
-                  onClick={() => handleClassClick(className)}
-                  variant="outline"
-                  className="h-auto py-6 text-lg font-semibold hover:bg-primary/20 hover:border-primary transition-all duration-300"
-                >
-                  {className}
-                </Button>
+        {loading ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Loading categories...</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+              {categories.map((category, index) => (
+                <CategoryCard
+                  key={category.id}
+                  title={category.title}
+                  description={category.description || ""}
+                  icon={getIcon(category.icon_name)}
+                  onClick={() => handleCategoryClick(category)}
+                  delay={index * 100}
+                />
               ))}
             </div>
-          </div>
+
+            {/* Classes Selection */}
+            {selectedCategory && selectedCategory.classes.length > 0 && (
+              <div className="glass-card rounded-3xl p-8 animate-slide-up">
+                <h3 className="text-2xl font-bold text-foreground mb-6">
+                  Select Your Class - {selectedCategory.title}
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {selectedCategory.classes.map((classItem) => (
+                    <Button
+                      key={classItem.id}
+                      onClick={() => handleClassClick(classItem.id, classItem.name)}
+                      variant="outline"
+                      className="h-auto py-6 text-lg font-semibold hover:bg-primary/20 hover:border-primary transition-all duration-300"
+                    >
+                      {classItem.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
 

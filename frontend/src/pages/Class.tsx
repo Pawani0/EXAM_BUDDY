@@ -1,33 +1,11 @@
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { SubjectCard } from "@/components/SubjectCard";
 import { Button } from "@/components/ui/button";
-import {
-  Book,
-  Calculator,
-  FlaskConical,
-  Atom,
-  Globe,
-  Languages,
-  FileText,
-  Download,
-  Clock,
-} from "lucide-react";
+import { Book } from "lucide-react";
 import { toast } from "sonner";
-
-const subjectIcons: Record<string, any> = {
-  Mathematics: Calculator,
-  Science: FlaskConical,
-  Evs: FlaskConical,
-  Physics: Atom,
-  Chemistry: FlaskConical,
-  Biology: Atom,
-  English: Languages,
-  Hindi: Languages,
-  History: Book,
-  Geography: Globe,
-  "Computer Science": Book,
-};
+import { getIcon, subjectIcons } from "@/lib/iconMapper";
 
 const subjectColors = [
   "bg-blue-500/20",
@@ -38,27 +16,61 @@ const subjectColors = [
   "bg-cyan-500/20",
 ];
 
-const getSubjectsForClass = (className: string) => {
-  const classNum = parseInt(className.match(/\d+/)?.[0] || "0");
-  
-  if (classNum >= 11) {
-    return ["Mathematics", "Physics", "Chemistry", "Biology", "English", "Computer Science"];
-  } else if (classNum >= 6) {
-    return ["Mathematics", "Science", "English", "History", "Geography"];
-  } else {
-    return ["Mathematics", "English", "Hindi", "Evs"];
-  }
-};
+interface Subject {
+  id: number;
+  class_id: number;
+  name: string;
+  icon_name?: string | null;
+  display_order: number;
+}
+
+interface ClassData {
+  id: number;
+  category_id: number;
+  name: string;
+  display_order: number;
+  subjects: Subject[];
+}
 
 const Class = () => {
-  const { className } = useParams();
+  const { classId, className } = useParams();
   const navigate = useNavigate();
-  const displayName = className?.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()) || "Class";
-  const subjects = getSubjectsForClass(displayName);
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+  
+  const [classData, setClassData] = useState<ClassData | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  const displayName = className?.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()) || classData?.name || "Class";
 
-  const handleSubjectClick = (subject: string) => {
-    const subjectSlug = subject.toLowerCase().replace(/\s+/g, "-");
-    navigate(`/class/${className}/resources/${subjectSlug}`);
+  useEffect(() => {
+    if (classId) {
+      loadClassData(parseInt(classId));
+    } else {
+      // Fallback: try to find class by name if no ID provided
+      toast.error("Class ID is required");
+      setLoading(false);
+    }
+  }, [classId]);
+
+  const loadClassData = async (id: number) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/classes/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setClassData(data);
+      } else {
+        toast.error("Failed to load class data");
+      }
+    } catch (error) {
+      toast.error("Failed to load class data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubjectClick = (subject: Subject) => {
+    const subjectSlug = subject.name.toLowerCase().replace(/\s+/g, "-");
+    navigate(`/class/${classId}/resources/${subjectSlug}`);
   };
 
   const handleQuickAction = (action: string) => {
@@ -94,22 +106,34 @@ const Class = () => {
       <section className="max-w-7xl mx-auto px-6">
         <div className="glass-card rounded-3xl p-8 animate-scale-in">
           <h2 className="text-3xl font-bold text-foreground mb-8">Subjects</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {subjects.map((subject, index) => {
-              const Icon = subjectIcons[subject] || Book;
-              const color = subjectColors[index % subjectColors.length];
-              
-              return (
-                <SubjectCard
-                  key={subject}
-                  name={subject}
-                  icon={Icon}
-                  color={color}
-                  onClick={() => handleSubjectClick(subject)}
-                />
-              );
-            })}
-          </div>
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Loading subjects...</p>
+            </div>
+          ) : classData && classData.subjects.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {classData.subjects.map((subject, index) => {
+                const Icon = subject.icon_name
+                  ? getIcon(subject.icon_name, subjectIcons[subject.name] || Book)
+                  : (subjectIcons[subject.name] || Book);
+                const color = subjectColors[index % subjectColors.length];
+                
+                return (
+                  <SubjectCard
+                    key={subject.id}
+                    name={subject.name}
+                    icon={Icon}
+                    color={color}
+                    onClick={() => handleSubjectClick(subject)}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No subjects available for this class.</p>
+            </div>
+          )}
         </div>
       </section>
     </div>

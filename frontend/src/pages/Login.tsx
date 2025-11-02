@@ -6,22 +6,59 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/useAuth";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!email || !password) {
+
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail || !password) {
       toast.error("Please fill in all fields");
       return;
     }
 
-    toast.success("Login successful! Redirecting...");
-    setTimeout(() => navigate("/"), 1500);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const message = errorData?.detail || errorData?.error || "Invalid email or password.";
+        toast.error(message);
+        return;
+      }
+
+      const user = await response.json();
+      setUser(user);
+
+  toast.success("Login successful! Redirecting...");
+  setTimeout(() => navigate("/student"), 1200);
+    } catch (error) {
+      console.error("Login failed", error);
+      toast.error("We couldn't reach the server. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -83,9 +120,10 @@ const Login = () => {
                 type="submit"
                 size="lg"
                 className="w-full gap-2 bg-primary hover:bg-primary/90"
+                disabled={isLoading}
               >
                 <LogIn className="h-5 w-5" />
-                Sign In
+                {isLoading ? "Signing In..." : "Sign In"}
               </Button>
             </form>
 
