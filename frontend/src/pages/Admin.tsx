@@ -28,7 +28,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/useAuth";
-import { Plus, Edit, Trash2, Save, X, Bell, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, Save, X, Bell, Loader2, ChevronRight, School, GraduationCap, BookOpen, Calendar, Book, ArrowLeft, Home } from "lucide-react";
 import { cache } from "@/lib/cache";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -49,8 +49,12 @@ interface Class {
 
 interface Subject {
   id: number;
-  class_id: number;
+  class_id?: number | null;
+  semester_id?: number | null;
   name: string;
+  code?: string;
+  credits?: number;
+  description?: string;
   icon_name?: string | null;
   display_order: number;
 }
@@ -151,6 +155,21 @@ const Admin = () => {
   const [materialSubjectId, setMaterialSubjectId] = useState<number | null>(null);
   const [notificationPriority, setNotificationPriority] = useState<"info" | "warning" | "urgent">("info");
   const [notificationActive, setNotificationActive] = useState<string>("1");
+
+  // Side-by-side view state
+  const [viewLevel, setViewLevel] = useState<'universities' | 'degrees' | 'branches' | 'years' | 'semesters' | 'subjects'>('universities');
+  const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null);
+  const [selectedDegree, setSelectedDegree] = useState<Degree | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+  const [selectedYear, setSelectedYear] = useState<Year | null>(null);
+  const [selectedSemester, setSelectedSemester] = useState<Semester | null>(null);
+  const [universityHierarchy, setUniversityHierarchy] = useState<Map<number, {
+    degrees: Degree[],
+    branches: Map<number, Branch[]>,
+    years: Map<number, Year[]>,
+    semesters: Map<number, Semester[]>,
+    subjects: Map<number, Subject[]>
+  }>>(new Map());
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [classDialogOpen, setClassDialogOpen] = useState(false);
@@ -351,7 +370,7 @@ const Admin = () => {
   };
 
   // Subject handlers
-  const handleSubjectSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleClassSubjectSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = {
@@ -391,7 +410,7 @@ const Admin = () => {
     }
   };
 
-  const handleDeleteSubject = async () => {
+  const handleClassSubjectDelete = async () => {
     if (!deleteConfirm) return;
     setIsSubmitting(true);
     try {
@@ -620,6 +639,520 @@ const Admin = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Degree handlers
+  const fetchDegrees = async (universityId: number) => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/universities/${universityId}/degrees`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error("Failed to fetch degrees");
+      const data = await res.json();
+      setDegrees(data);
+    } catch (error) {
+      toast.error("Failed to load degrees");
+    }
+  };
+
+  const handleDegreeSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedUniId) {
+      toast.error("Please select a university first");
+      return;
+    }
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      university_id: selectedUniId,
+      name: formData.get("name") as string,
+      display_order: parseInt(formData.get("display_order") as string) || 0,
+    };
+
+    setIsSubmitting(true);
+    try {
+      if (editingItem) {
+        await fetch(`${apiBaseUrl}/admin/degrees/${editingItem.id}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(data),
+        });
+        toast.success("Degree updated");
+      } else {
+        await fetch(`${apiBaseUrl}/admin/degrees`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(data),
+        });
+        toast.success("Degree created");
+      }
+      setDegreeDialogOpen(false);
+      setTimeout(() => setEditingItem(null), 100);
+      if (selectedUniId) fetchDegrees(selectedUniId);
+    } catch (error) {
+      toast.error("Failed to save degree");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteDegree = async () => {
+    if (!deleteConfirm) return;
+    setIsSubmitting(true);
+    try {
+      await fetch(`${apiBaseUrl}/admin/degrees/${deleteConfirm.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      toast.success("Degree deleted");
+      setDeleteConfirm(null);
+      if (selectedUniId) fetchDegrees(selectedUniId);
+    } catch (error) {
+      toast.error("Failed to delete degree");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Branch handlers
+  const fetchBranches = async (degreeId: number) => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/degrees/${degreeId}/branches`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error("Failed to fetch branches");
+      const data = await res.json();
+      setBranches(data);
+    } catch (error) {
+      toast.error("Failed to load branches");
+    }
+  };
+
+  const handleBranchSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedDegreeId) {
+      toast.error("Please select a degree first");
+      return;
+    }
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      degree_id: selectedDegreeId,
+      name: formData.get("name") as string,
+      display_order: parseInt(formData.get("display_order") as string) || 0,
+    };
+
+    setIsSubmitting(true);
+    try {
+      if (editingItem) {
+        await fetch(`${apiBaseUrl}/admin/branches/${editingItem.id}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(data),
+        });
+        toast.success("Branch updated");
+      } else {
+        await fetch(`${apiBaseUrl}/admin/branches`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(data),
+        });
+        toast.success("Branch created");
+      }
+      setBranchDialogOpen(false);
+      setTimeout(() => setEditingItem(null), 100);
+      if (selectedDegreeId) fetchBranches(selectedDegreeId);
+    } catch (error) {
+      toast.error("Failed to save branch");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteBranch = async () => {
+    if (!deleteConfirm) return;
+    setIsSubmitting(true);
+    try {
+      await fetch(`${apiBaseUrl}/admin/branches/${deleteConfirm.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      toast.success("Branch deleted");
+      setDeleteConfirm(null);
+      if (selectedDegreeId) fetchBranches(selectedDegreeId);
+    } catch (error) {
+      toast.error("Failed to delete branch");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Year handlers
+  const fetchYears = async (branchId: number) => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/branches/${branchId}/years`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error("Failed to fetch years");
+      const data = await res.json();
+      setYears(data);
+    } catch (error) {
+      toast.error("Failed to load years");
+    }
+  };
+
+  const handleYearSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedBranchId) {
+      toast.error("Please select a branch first");
+      return;
+    }
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      branch_id: selectedBranchId,
+      name: formData.get("name") as string,
+      display_order: parseInt(formData.get("display_order") as string) || 0,
+    };
+
+    setIsSubmitting(true);
+    try {
+      if (editingItem) {
+        await fetch(`${apiBaseUrl}/admin/years/${editingItem.id}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(data),
+        });
+        toast.success("Year updated");
+      } else {
+        await fetch(`${apiBaseUrl}/admin/years`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(data),
+        });
+        toast.success("Year created");
+      }
+      setYearDialogOpen(false);
+      setTimeout(() => setEditingItem(null), 100);
+      if (selectedBranchId) fetchYears(selectedBranchId);
+    } catch (error) {
+      toast.error("Failed to save year");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteYear = async () => {
+    if (!deleteConfirm) return;
+    setIsSubmitting(true);
+    try {
+      await fetch(`${apiBaseUrl}/admin/years/${deleteConfirm.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      toast.success("Year deleted");
+      setDeleteConfirm(null);
+      if (selectedBranchId) fetchYears(selectedBranchId);
+    } catch (error) {
+      toast.error("Failed to delete year");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Semester handlers
+  const fetchSemesters = async (yearId: number) => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/years/${yearId}/semesters`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error("Failed to fetch semesters");
+      const data = await res.json();
+      setSemesters(data);
+    } catch (error) {
+      toast.error("Failed to load semesters");
+    }
+  };
+
+  const handleSemesterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedYearId) {
+      toast.error("Please select a year first");
+      return;
+    }
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      year_id: selectedYearId,
+      name: formData.get("name") as string,
+      display_order: parseInt(formData.get("display_order") as string) || 0,
+    };
+
+    setIsSubmitting(true);
+    try {
+      if (editingItem) {
+        await fetch(`${apiBaseUrl}/admin/semesters/${editingItem.id}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(data),
+        });
+        toast.success("Semester updated");
+      } else {
+        await fetch(`${apiBaseUrl}/admin/semesters`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(data),
+        });
+        toast.success("Semester created");
+      }
+      setSemesterDialogOpen(false);
+      setTimeout(() => setEditingItem(null), 100);
+      if (selectedYearId) fetchSemesters(selectedYearId);
+    } catch (error) {
+      toast.error("Failed to save semester");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteSemester = async () => {
+    if (!deleteConfirm) return;
+    setIsSubmitting(true);
+    try {
+      await fetch(`${apiBaseUrl}/admin/semesters/${deleteConfirm.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      toast.success("Semester deleted");
+      setDeleteConfirm(null);
+      // Reload semesters for the current year
+      if (selectedUniversity && selectedYear) {
+        await loadSemestersForYear(selectedUniversity.id, selectedYear.id);
+      }
+    } catch (error) {
+      toast.error("Failed to delete semester");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubjectSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedSemester) {
+      toast.error("Please select a semester first");
+      return;
+    }
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      semester_id: selectedSemester.id,
+      name: formData.get("name") as string,
+      code: formData.get("code") as string,
+      credits: parseInt(formData.get("credits") as string) || 0,
+      description: formData.get("description") as string,
+      display_order: parseInt(formData.get("display_order") as string) || 0,
+    };
+
+    setIsSubmitting(true);
+    try {
+      if (editingItem) {
+        await fetch(`${apiBaseUrl}/admin/subjects/${editingItem.id}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(data),
+        });
+        toast.success("Subject updated");
+      } else {
+        await fetch(`${apiBaseUrl}/admin/subjects`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(data),
+        });
+        toast.success("Subject created");
+      }
+      setSubjectDialogOpen(false);
+      setTimeout(() => setEditingItem(null), 100);
+      // Reload subjects
+      if (selectedUniversity && selectedSemester) {
+        await loadSubjectsForSemester(selectedUniversity.id, selectedSemester.id);
+      }
+    } catch (error) {
+      toast.error("Failed to save subject");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteSubject = async () => {
+    if (!deleteConfirm) return;
+    setIsSubmitting(true);
+    try {
+      await fetch(`${apiBaseUrl}/admin/subjects/${deleteConfirm.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      toast.success("Subject deleted");
+      setDeleteConfirm(null);
+      // Reload subjects
+      if (selectedUniversity && selectedSemester) {
+        await loadSubjectsForSemester(selectedUniversity.id, selectedSemester.id);
+      }
+    } catch (error) {
+      toast.error("Failed to delete subject");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Tree view helpers
+  const loadDegreesForUniversity = async (uniId: number) => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/universities/${uniId}/degrees`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const degreesData = await res.json();
+        setUniversityHierarchy(prev => {
+          const newMap = new Map(prev);
+          const existing = newMap.get(uniId);
+          newMap.set(uniId, {
+            degrees: degreesData,
+            branches: existing?.branches || new Map(),
+            years: existing?.years || new Map(),
+            semesters: existing?.semesters || new Map(),
+            subjects: existing?.subjects || new Map()
+          });
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error("Error loading degrees:", error);
+    }
+  };
+
+  const loadBranchesForDegree = async (uniId: number, degreeId: number) => {
+    const hierarchy = universityHierarchy.get(uniId);
+    if (!hierarchy) return;
+
+    if (!hierarchy.branches.has(degreeId)) {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/degrees/${degreeId}/branches`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const branchesData = await res.json();
+          hierarchy.branches.set(degreeId, branchesData);
+          setUniversityHierarchy(new Map(universityHierarchy));
+        }
+      } catch (error) {
+        console.error("Error loading branches:", error);
+      }
+    }
+  };
+
+  const loadYearsForBranch = async (uniId: number, branchId: number) => {
+    const hierarchy = universityHierarchy.get(uniId);
+    if (!hierarchy) return;
+
+    if (!hierarchy.years.has(branchId)) {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/branches/${branchId}/years`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const yearsData = await res.json();
+          hierarchy.years.set(branchId, yearsData);
+          setUniversityHierarchy(new Map(universityHierarchy));
+        }
+      } catch (error) {
+        console.error("Error loading years:", error);
+      }
+    }
+  };
+
+  const loadSemestersForYear = async (uniId: number, yearId: number) => {
+    const hierarchy = universityHierarchy.get(uniId);
+    if (!hierarchy) return;
+
+    if (!hierarchy.semesters.has(yearId)) {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/years/${yearId}/semesters`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const semestersData = await res.json();
+          hierarchy.semesters.set(yearId, semestersData);
+          setUniversityHierarchy(new Map(universityHierarchy));
+        }
+      } catch (error) {
+        console.error("Error loading semesters:", error);
+      }
+    }
+  };
+
+  const loadSubjectsForSemester = async (uniId: number, semesterId: number) => {
+    const hierarchy = universityHierarchy.get(uniId);
+    if (!hierarchy) return;
+
+    if (!hierarchy.subjects.has(semesterId)) {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/semesters/${semesterId}/subjects`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const subjectsData = await res.json();
+          hierarchy.subjects.set(semesterId, subjectsData);
+          setUniversityHierarchy(new Map(universityHierarchy));
+        }
+      } catch (error) {
+        console.error("Error loading subjects:", error);
+      }
+    }
+  };
+
+  const handleSelectUniversity = async (uni: University) => {
+    setSelectedUniversity(uni);
+    setViewLevel('degrees');
+    // Load degrees if not already loaded
+    if (!universityHierarchy.has(uni.id) || !universityHierarchy.get(uni.id)?.degrees.length) {
+      await loadDegreesForUniversity(uni.id);
+    }
+  };
+
+  const handleSelectDegree = async (degree: Degree) => {
+    setSelectedDegree(degree);
+    setViewLevel('branches');
+    if (selectedUniversity) {
+      await loadBranchesForDegree(selectedUniversity.id, degree.id);
+    }
+  };
+
+  const handleSelectBranch = async (branch: Branch) => {
+    setSelectedBranch(branch);
+    setViewLevel('years');
+    if (selectedUniversity) {
+      await loadYearsForBranch(selectedUniversity.id, branch.id);
+    }
+  };
+
+  const handleSelectYear = async (year: Year) => {
+    setSelectedYear(year);
+    setViewLevel('semesters');
+    if (selectedUniversity) {
+      await loadSemestersForYear(selectedUniversity.id, year.id);
+    }
+  };
+
+  const handleSelectSemester = async (semester: Semester) => {
+    setSelectedSemester(semester);
+    setViewLevel('subjects');
+    if (selectedUniversity) {
+      await loadSubjectsForSemester(selectedUniversity.id, semester.id);
+    }
+  };
+
+  const handleBack = () => {
+    switch (viewLevel) {
+      case 'degrees':
+        setViewLevel('universities');
+        setSelectedUniversity(null);
+        break;
+      case 'branches':
+        setViewLevel('degrees');
+        setSelectedDegree(null);
+        break;
+      case 'years':
+        setViewLevel('branches');
+        setSelectedBranch(null);
+        break;
+      case 'semesters':
+        setViewLevel('years');
+        setSelectedYear(null);
+        break;
+      case 'subjects':
+        setViewLevel('semesters');
+        setSelectedSemester(null);
+        break;
+        break;
+    }
+  };
+
 
   const filteredClasses = selectedCategoryId
     ? classes.filter((c) => c.category_id === selectedCategoryId)
@@ -963,7 +1496,7 @@ const Admin = () => {
                       <DialogHeader>
                         <DialogTitle>{editingItem ? "Edit" : "Create"} Subject</DialogTitle>
                       </DialogHeader>
-                      <form key={editingItem && 'id' in editingItem ? `subject-form-${editingItem.id}` : "subject-form-new"} onSubmit={handleSubjectSubmit} className="space-y-4">
+                      <form key={editingItem && 'id' in editingItem ? `subject-form-${editingItem.id}` : "subject-form-new"} onSubmit={handleClassSubjectSubmit} className="space-y-4">
                         <div>
                           <Label htmlFor="subject-class">Class *</Label>
                           <Select
@@ -1054,7 +1587,7 @@ const Admin = () => {
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => setDeleteConfirm({ type: "subject", id: subj.id })}
+                              onClick={() => setDeleteConfirm({ type: "class_subject", id: subj.id })}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1544,133 +2077,550 @@ const Admin = () => {
 
               {/* Universities Tab */}
               <TabsContent value="universities" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Universities ({universities.length})</h3>
-                  <Dialog
-                    open={universityDialogOpen}
-                    onOpenChange={(open) => {
-                      setUniversityDialogOpen(open);
-                      if (!open) {
-                        setTimeout(() => setEditingItem(null), 200);
-                      }
-                    }}
-                  >
-                    <DialogTrigger asChild>
-                      <Button onClick={() => {
-                        setEditingItem(null);
-                      }}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add University
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent key={hasProp(editingItem, 'id') ? `uni-dialog-${(editingItem as any).id}` : "uni-dialog-new"}>
-                      <DialogHeader>
-                        <DialogTitle>{editingItem ? "Edit" : "Create"} University</DialogTitle>
-                      </DialogHeader>
-                      <form key={hasProp(editingItem, 'id') ? `uni-form-${(editingItem as any).id}` : "uni-form-new"} onSubmit={handleUniversitySubmit} className="space-y-4">
-                        <div>
-                          <Label htmlFor="uni-name">Name *</Label>
-                          <Input
-                            id="uni-name"
-                            name="name"
-                            required
-                            defaultValue={hasProp(editingItem, 'name') ? (editingItem as University).name : ""}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="uni-description">Description</Label>
-                          <Textarea
-                            id="uni-description"
-                            name="description"
-                            defaultValue={hasProp(editingItem, 'description') ? (editingItem as University).description || "" : ""}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="uni-icon">Icon Name</Label>
-                          <Input
-                            id="uni-icon"
-                            name="icon_name"
-                            placeholder="e.g., School, BookOpen"
-                            defaultValue={hasProp(editingItem, 'icon_name') ? (editingItem as University).icon_name || "" : ""}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="uni-order">Display Order</Label>
-                          <Input
-                            id="uni-order"
-                            name="display_order"
-                            type="number"
-                            defaultValue={hasProp(editingItem, 'display_order') ? (editingItem as University).display_order : 0}
-                          />
-                        </div>
-                        <div className="flex gap-2 justify-end">
-                          <Button type="button" variant="outline" onClick={() => setUniversityDialogOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                            Save
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                {/* Breadcrumb Navigation */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2 bg-muted/30 p-2 rounded-md">
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => { setViewLevel('universities'); setSelectedUniversity(null); setSelectedDegree(null); setSelectedBranch(null); setSelectedYear(null); }}>
+                    <Home className="h-4 w-4" />
+                  </Button>
+
+                  {selectedUniversity && (
+                    <>
+                      <ChevronRight className="h-4 w-4" />
+                      <button
+                        className={`hover:text-primary hover:underline ${viewLevel === 'universities' ? 'font-semibold text-foreground' : ''}`}
+                        onClick={() => { setViewLevel('universities'); setSelectedDegree(null); setSelectedBranch(null); setSelectedYear(null); }}
+                      >
+                        {selectedUniversity.name}
+                      </button>
+                    </>
+                  )}
+
+                  {selectedDegree && (
+                    <>
+                      <ChevronRight className="h-4 w-4" />
+                      <button
+                        className={`hover:text-primary hover:underline ${viewLevel === 'degrees' ? 'font-semibold text-foreground' : ''}`}
+                        onClick={() => { setViewLevel('degrees'); setSelectedBranch(null); setSelectedYear(null); }}
+                      >
+                        {selectedDegree.name}
+                      </button>
+                    </>
+                  )}
+
+                  {selectedBranch && (
+                    <>
+                      <ChevronRight className="h-4 w-4" />
+                      <button
+                        className={`hover:text-primary hover:underline ${viewLevel === 'branches' ? 'font-semibold text-foreground' : ''}`}
+                        onClick={() => { setViewLevel('branches'); setSelectedYear(null); }}
+                      >
+                        {selectedBranch.name}
+                      </button>
+                    </>
+                  )}
+
+                  {selectedYear && (
+                    <>
+                      <ChevronRight className="h-4 w-4" />
+                      <button
+                        className={`hover:text-primary hover:underline ${viewLevel === 'years' ? 'font-semibold text-foreground' : ''}`}
+                        onClick={() => setViewLevel('years')}
+                      >
+                        {selectedYear.name}
+                      </button>
+                    </>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <Card key={i}>
-                        <CardContent className="flex items-center justify-between p-4">
-                          <div className="space-y-2">
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-3 w-32" />
-                            <Skeleton className="h-3 w-16" />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
+                  {/* Left Panel - Master List */}
+                  <Card className="lg:col-span-1 flex flex-col overflow-hidden">
+                    <CardHeader className="py-3 px-4 border-b bg-muted/20 flex flex-row items-center justify-between shrink-0">
+                      <CardTitle className="text-base font-medium">
+                        {viewLevel === 'universities' && 'Universities'}
+                        {viewLevel === 'degrees' && 'Degrees'}
+                        {viewLevel === 'branches' && 'Courses'}
+                        {viewLevel === 'years' && 'Years'}
+                        {viewLevel === 'semesters' && 'Semesters'}
+                      </CardTitle>
+
+                      {/* Add Button & Dialogs */}
+                      {viewLevel === 'universities' && (
+                        <Dialog open={universityDialogOpen} onOpenChange={(open) => { setUniversityDialogOpen(open); if (!open) setTimeout(() => setEditingItem(null), 200); }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setEditingItem(null)}>
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>{editingItem ? "Edit" : "Create"} University</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={handleUniversitySubmit} className="space-y-4">
+                              <div>
+                                <Label htmlFor="uni-name">Name *</Label>
+                                <Input id="uni-name" name="name" required defaultValue={hasProp(editingItem, 'name') ? (editingItem as University).name : ""} />
+                              </div>
+                              <div>
+                                <Label htmlFor="uni-description">Description</Label>
+                                <Textarea id="uni-description" name="description" defaultValue={hasProp(editingItem, 'description') ? (editingItem as University).description || "" : ""} />
+                              </div>
+                              <div>
+                                <Label htmlFor="uni-icon">Icon Name</Label>
+                                <Input id="uni-icon" name="icon_name" placeholder="e.g., School, BookOpen" defaultValue={hasProp(editingItem, 'icon_name') ? (editingItem as University).icon_name || "" : ""} />
+                              </div>
+                              <div>
+                                <Label htmlFor="uni-order">Display Order</Label>
+                                <Input id="uni-order" name="display_order" type="number" defaultValue={hasProp(editingItem, 'display_order') ? (editingItem as University).display_order : 0} />
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <Button type="button" variant="outline" onClick={() => setUniversityDialogOpen(false)}>Cancel</Button>
+                                <Button type="submit" disabled={isSubmitting}>
+                                  {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
+                                </Button>
+                              </div>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+
+                      {viewLevel === 'degrees' && (
+                        <Dialog open={degreeDialogOpen} onOpenChange={(open) => { setDegreeDialogOpen(open); if (!open) setTimeout(() => setEditingItem(null), 200); }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setSelectedUniId(selectedUniversity!.id); setEditingItem(null); }}>
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>{editingItem ? "Edit" : "Create"} Degree</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={handleDegreeSubmit} className="space-y-4">
+                              <div>
+                                <Label htmlFor="degree-name">Name *</Label>
+                                <Input id="degree-name" name="name" required defaultValue={hasProp(editingItem, 'name') ? (editingItem as Degree).name : ""} />
+                              </div>
+                              <div>
+                                <Label htmlFor="degree-order">Display Order</Label>
+                                <Input id="degree-order" name="display_order" type="number" defaultValue={hasProp(editingItem, 'display_order') ? (editingItem as Degree).display_order : 0} />
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <Button type="button" variant="outline" onClick={() => setDegreeDialogOpen(false)}>Cancel</Button>
+                                <Button type="submit" disabled={isSubmitting}>
+                                  {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
+                                </Button>
+                              </div>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+
+                      {viewLevel === 'branches' && (
+                        <Dialog open={branchDialogOpen} onOpenChange={(open) => { setBranchDialogOpen(open); if (!open) setTimeout(() => setEditingItem(null), 200); }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setSelectedDegreeId(selectedDegree!.id); setEditingItem(null); }}>
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>{editingItem ? "Edit" : "Create"} Course</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={handleBranchSubmit} className="space-y-4">
+                              <div>
+                                <Label htmlFor="branch-name">Name *</Label>
+                                <Input id="branch-name" name="name" required defaultValue={hasProp(editingItem, 'name') ? (editingItem as Branch).name : ""} />
+                              </div>
+                              <div>
+                                <Label htmlFor="branch-order">Display Order</Label>
+                                <Input id="branch-order" name="display_order" type="number" defaultValue={hasProp(editingItem, 'display_order') ? (editingItem as Branch).display_order : 0} />
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <Button type="button" variant="outline" onClick={() => setBranchDialogOpen(false)}>Cancel</Button>
+                                <Button type="submit" disabled={isSubmitting}>
+                                  {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
+                                </Button>
+                              </div>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+
+                      {viewLevel === 'years' && (
+                        <Dialog open={yearDialogOpen} onOpenChange={(open) => { setYearDialogOpen(open); if (!open) setTimeout(() => setEditingItem(null), 200); }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setSelectedBranchId(selectedBranch!.id); setEditingItem(null); }}>
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>{editingItem ? "Edit" : "Create"} Year</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={handleYearSubmit} className="space-y-4">
+                              <div>
+                                <Label htmlFor="year-name">Name *</Label>
+                                <Input id="year-name" name="name" required defaultValue={hasProp(editingItem, 'name') ? (editingItem as Year).name : ""} />
+                              </div>
+                              <div>
+                                <Label htmlFor="year-order">Display Order</Label>
+                                <Input id="year-order" name="display_order" type="number" defaultValue={hasProp(editingItem, 'display_order') ? (editingItem as Year).display_order : 0} />
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <Button type="button" variant="outline" onClick={() => setYearDialogOpen(false)}>Cancel</Button>
+                                <Button type="submit" disabled={isSubmitting}>
+                                  {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
+                                </Button>
+                              </div>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+
+                      {viewLevel === 'semesters' && (
+                        <Dialog open={semesterDialogOpen} onOpenChange={(open) => { setSemesterDialogOpen(open); if (!open) setTimeout(() => setEditingItem(null), 200); }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setSelectedYearId(selectedYear!.id); setEditingItem(null); }}>
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>{editingItem ? "Edit" : "Create"} Semester</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={handleSemesterSubmit} className="space-y-4">
+                              <div>
+                                <Label htmlFor="semester-name">Name *</Label>
+                                <Input id="semester-name" name="name" required defaultValue={hasProp(editingItem, 'name') ? (editingItem as Semester).name : ""} />
+                              </div>
+                              <div>
+                                <Label htmlFor="semester-order">Display Order</Label>
+                                <Input id="semester-order" name="display_order" type="number" defaultValue={hasProp(editingItem, 'display_order') ? (editingItem as Semester).display_order : 0} />
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <Button type="button" variant="outline" onClick={() => setSemesterDialogOpen(false)}>Cancel</Button>
+                                <Button type="submit" disabled={isSubmitting}>
+                                  {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
+                                </Button>
+                              </div>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+
+                      {viewLevel === 'subjects' && (
+                        <Dialog open={subjectDialogOpen} onOpenChange={(open) => { setSubjectDialogOpen(open); if (!open) setTimeout(() => setEditingItem(null), 200); }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setEditingItem(null); }}>
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>{editingItem ? "Edit" : "Create"} Subject</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={handleSubjectSubmit} className="space-y-4">
+                              <div>
+                                <Label htmlFor="subject-name">Name *</Label>
+                                <Input id="subject-name" name="name" required defaultValue={hasProp(editingItem, 'name') ? (editingItem as Subject).name : ""} />
+                              </div>
+                              <div>
+                                <Label htmlFor="subject-code">Code</Label>
+                                <Input id="subject-code" name="code" placeholder="e.g. CS101" defaultValue={hasProp(editingItem, 'code') ? (editingItem as Subject).code : ""} />
+                              </div>
+                              <div>
+                                <Label htmlFor="subject-credits">Credits</Label>
+                                <Input id="subject-credits" name="credits" type="number" defaultValue={hasProp(editingItem, 'credits') ? (editingItem as Subject).credits : 0} />
+                              </div>
+                              <div>
+                                <Label htmlFor="subject-description">Description</Label>
+                                <Textarea id="subject-description" name="description" defaultValue={hasProp(editingItem, 'description') ? (editingItem as Subject).description || "" : ""} />
+                              </div>
+                              <div>
+                                <Label htmlFor="subject-order">Display Order</Label>
+                                <Input id="subject-order" name="display_order" type="number" defaultValue={hasProp(editingItem, 'display_order') ? (editingItem as Subject).display_order : 0} />
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <Button type="button" variant="outline" onClick={() => setSubjectDialogOpen(false)}>Cancel</Button>
+                                <Button type="submit" disabled={isSubmitting}>
+                                  {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
+                                </Button>
+                              </div>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto p-2 space-y-1">
+                      {viewLevel === 'universities' && universities.map(uni => (
+                        <div key={uni.id}
+                          className={`p-3 rounded-md cursor-pointer transition-all flex items-center justify-between group ${selectedUniversity?.id === uni.id ? 'bg-primary/10 border-primary/20 border shadow-sm' : 'hover:bg-muted border border-transparent'}`}
+                          onClick={() => handleSelectUniversity(uni)}>
+                          <div className="flex items-center gap-3">
+                            <School className={`h-4 w-4 ${selectedUniversity?.id === uni.id ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <span className="font-medium text-sm">{uni.name}</span>
                           </div>
-                          <div className="flex gap-2">
-                            <Skeleton className="h-8 w-8" />
-                            <Skeleton className="h-8 w-8" />
+                          {selectedUniversity?.id === uni.id && <ChevronRight className="h-4 w-4 text-primary" />}
+                        </div>
+                      ))}
+
+                      {viewLevel === 'degrees' && selectedUniversity && universityHierarchy.get(selectedUniversity.id)?.degrees.map(deg => (
+                        <div key={deg.id}
+                          className={`p-3 rounded-md cursor-pointer transition-all flex items-center justify-between group ${selectedDegree?.id === deg.id ? 'bg-primary/10 border-primary/20 border shadow-sm' : 'hover:bg-muted border border-transparent'}`}
+                          onClick={() => handleSelectDegree(deg)}>
+                          <div className="flex items-center gap-3">
+                            <GraduationCap className={`h-4 w-4 ${selectedDegree?.id === deg.id ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <span className="font-medium text-sm">{deg.name}</span>
+                          </div>
+                          {selectedDegree?.id === deg.id && <ChevronRight className="h-4 w-4 text-primary" />}
+                        </div>
+                      ))}
+
+                      {viewLevel === 'branches' && selectedDegree && universityHierarchy.get(selectedUniversity!.id)?.branches.get(selectedDegree.id)?.map(branch => (
+                        <div key={branch.id}
+                          className={`p-3 rounded-md cursor-pointer transition-all flex items-center justify-between group ${selectedBranch?.id === branch.id ? 'bg-primary/10 border-primary/20 border shadow-sm' : 'hover:bg-muted border border-transparent'}`}
+                          onClick={() => handleSelectBranch(branch)}>
+                          <div className="flex items-center gap-3">
+                            <BookOpen className={`h-4 w-4 ${selectedBranch?.id === branch.id ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <span className="font-medium text-sm">{branch.name}</span>
+                          </div>
+                          {selectedBranch?.id === branch.id && <ChevronRight className="h-4 w-4 text-primary" />}
+                        </div>
+                      ))}
+
+                      {viewLevel === 'years' && selectedBranch && universityHierarchy.get(selectedUniversity!.id)?.years.get(selectedBranch.id)?.map(year => (
+                        <div key={year.id}
+                          className={`p-3 rounded-md cursor-pointer transition-all flex items-center justify-between group ${selectedYear?.id === year.id ? 'bg-primary/10 border-primary/20 border shadow-sm' : 'hover:bg-muted border border-transparent'}`}
+                          onClick={() => handleSelectYear(year)}>
+                          <div className="flex items-center gap-3">
+                            <Calendar className={`h-4 w-4 ${selectedYear?.id === year.id ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <span className="font-medium text-sm">{year.name}</span>
+                          </div>
+                          {selectedYear?.id === year.id && <ChevronRight className="h-4 w-4 text-primary" />}
+                        </div>
+                      ))}
+
+                      {viewLevel === 'semesters' && selectedYear && universityHierarchy.get(selectedUniversity!.id)?.semesters.get(selectedYear.id)?.map(sem => (
+                        <div key={sem.id}
+                          className={`p-3 rounded-md cursor-pointer transition-all flex items-center justify-between group ${selectedSemester?.id === sem.id ? 'bg-primary/10 border-primary/20 border shadow-sm' : 'hover:bg-muted border border-transparent'}`}
+                          onClick={() => handleSelectSemester(sem)}>
+                          <div className="flex items-center gap-3">
+                            <Book className={`h-4 w-4 ${selectedSemester?.id === sem.id ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <span className="font-medium text-sm">{sem.name}</span>
+                          </div>
+                          {selectedSemester?.id === sem.id && <ChevronRight className="h-4 w-4 text-primary" />}
+                        </div>
+                      ))}
+
+                      {viewLevel === 'subjects' && selectedSemester && universityHierarchy.get(selectedUniversity!.id)?.subjects.get(selectedSemester.id)?.map(sub => (
+                        <div key={sub.id}
+                          className={`p-3 rounded-md cursor-pointer transition-all flex items-center justify-between group border border-transparent hover:bg-muted`}
+                          onClick={() => { /* Maybe select subject for details? */ }}>
+                          <div className="flex items-center gap-3">
+                            <BookOpen className={`h-4 w-4 text-muted-foreground`} />
+                            <span className="font-medium text-sm">{sub.name}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  {/* Right Panel - Details & Children */}
+                  <Card className="lg:col-span-2 flex flex-col overflow-hidden">
+                    {(!selectedUniversity && viewLevel === 'universities') ? (
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center">
+                        <div className="bg-muted/30 p-4 rounded-full mb-4">
+                          <School className="h-12 w-12 opacity-20" />
+                        </div>
+                        <h3 className="text-lg font-medium mb-1">Select a University</h3>
+                        <p className="text-sm max-w-xs">Choose a university from the list to manage its degrees, courses, and curriculum.</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Selected Item Header */}
+                        <CardHeader className="py-4 px-6 border-b bg-muted/10 shrink-0">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
+                                  {viewLevel === 'universities' && 'University'}
+                                  {viewLevel === 'degrees' && 'Degree'}
+                                  {viewLevel === 'branches' && 'Course'}
+                                  {viewLevel === 'years' && 'Year'}
+                                  {viewLevel === 'semesters' && 'Semester'}
+                                  {viewLevel === 'subjects' && 'Subject List'}
+                                </span>
+                              </div>
+                              <CardTitle className="text-2xl">
+                                {viewLevel === 'universities' && selectedUniversity?.name}
+                                {viewLevel === 'degrees' && selectedDegree?.name}
+                                {viewLevel === 'branches' && selectedBranch?.name}
+                                {viewLevel === 'years' && selectedYear?.name}
+                                {viewLevel === 'semesters' && selectedYear?.name + " Semesters"}
+                                {viewLevel === 'subjects' && selectedSemester?.name + " Subjects"}
+                              </CardTitle>
+                              <CardDescription className="mt-1">
+                                {viewLevel === 'universities' && selectedUniversity?.description}
+                              </CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                              {viewLevel !== 'semesters' && viewLevel !== 'subjects' && (
+                                <>
+                                  <Button variant="outline" size="sm" onClick={() => {
+                                    const item = viewLevel === 'universities' ? selectedUniversity :
+                                      viewLevel === 'degrees' ? selectedDegree :
+                                        viewLevel === 'branches' ? selectedBranch :
+                                          viewLevel === 'years' ? selectedYear : null;
+                                    setEditingItem(item);
+                                    if (viewLevel === 'universities') setUniversityDialogOpen(true);
+                                    if (viewLevel === 'degrees') setDegreeDialogOpen(true);
+                                    if (viewLevel === 'branches') setBranchDialogOpen(true);
+                                    if (viewLevel === 'years') setYearDialogOpen(true);
+                                  }}>
+                                    <Edit className="h-3.5 w-3.5 mr-1.5" /> Edit
+                                  </Button>
+                                  <Button variant="destructive" size="sm" onClick={() => {
+                                    const item = viewLevel === 'universities' ? selectedUniversity :
+                                      viewLevel === 'degrees' ? selectedDegree :
+                                        viewLevel === 'branches' ? selectedBranch :
+                                          viewLevel === 'years' ? selectedYear : null;
+                                    if (item) setDeleteConfirm({ type: viewLevel === 'branches' ? 'branch' : viewLevel.slice(0, -1), id: item.id });
+                                  }}>
+                                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </CardHeader>
+
+                        {/* Children List */}
+                        <CardContent className="flex-1 overflow-y-auto p-6 bg-muted/5">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold flex items-center gap-2">
+                              {viewLevel === 'universities' && <><GraduationCap className="h-5 w-5 text-purple-500" /> Degrees</>}
+                              {viewLevel === 'degrees' && <><BookOpen className="h-5 w-5 text-green-500" /> Courses</>}
+                              {viewLevel === 'branches' && <><Calendar className="h-5 w-5 text-orange-500" /> Years</>}
+                              {viewLevel === 'years' && <><Book className="h-5 w-5 text-blue-500" /> Semesters</>}
+                              {viewLevel === 'semesters' && <><Book className="h-5 w-5 text-blue-500" /> Subjects</>}
+                              {viewLevel === 'subjects' && <><BookOpen className="h-5 w-5 text-blue-500" /> Subjects</>}
+                            </h3>
+                            {viewLevel !== 'subjects' && (
+                              <Button size="sm" onClick={() => {
+                                setEditingItem(null);
+                                if (viewLevel === 'universities') { setSelectedUniId(selectedUniversity!.id); setDegreeDialogOpen(true); }
+                                if (viewLevel === 'degrees') { setSelectedDegreeId(selectedDegree!.id); setBranchDialogOpen(true); }
+                                if (viewLevel === 'branches') { setSelectedBranchId(selectedBranch!.id); setYearDialogOpen(true); }
+                                if (viewLevel === 'years') { setSelectedYearId(selectedYear!.id); setSemesterDialogOpen(true); }
+                                if (viewLevel === 'semesters') { setSelectedSemesterId(selectedSemester!.id); setSubjectDialogOpen(true); }
+                              }}>
+                                <Plus className="h-4 w-4 mr-1.5" /> Add New
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {(viewLevel === 'universities' || (viewLevel === 'degrees' && !selectedDegree)) && selectedUniversity && universityHierarchy.get(selectedUniversity.id)?.degrees.map(deg => (
+                              <Card key={deg.id} className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group" onClick={() => handleSelectDegree(deg)}>
+                                <CardContent className="p-4 flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-purple-100 p-2 rounded-full text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                      <GraduationCap className="h-5 w-5" />
+                                    </div>
+                                    <span className="font-medium">{deg.name}</span>
+                                  </div>
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                                </CardContent>
+                              </Card>
+                            ))}
+
+                            {(viewLevel === 'degrees' || (viewLevel === 'branches' && !selectedBranch)) && selectedDegree && universityHierarchy.get(selectedUniversity!.id)?.branches.get(selectedDegree.id)?.map(branch => (
+                              <Card key={branch.id} className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group" onClick={() => handleSelectBranch(branch)}>
+                                <CardContent className="p-4 flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-green-100 p-2 rounded-full text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
+                                      <BookOpen className="h-5 w-5" />
+                                    </div>
+                                    <span className="font-medium">{branch.name}</span>
+                                  </div>
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                                </CardContent>
+                              </Card>
+                            ))}
+
+                            {(viewLevel === 'branches' || (viewLevel === 'years' && !selectedYear)) && selectedBranch && universityHierarchy.get(selectedUniversity!.id)?.years.get(selectedBranch.id)?.map(year => (
+                              <Card key={year.id} className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group" onClick={() => handleSelectYear(year)}>
+                                <CardContent className="p-4 flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-orange-100 p-2 rounded-full text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                                      <Calendar className="h-5 w-5" />
+                                    </div>
+                                    <span className="font-medium">{year.name}</span>
+                                  </div>
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                                </CardContent>
+                              </Card>
+                            ))}
+
+                            {(viewLevel === 'years' || (viewLevel === 'semesters' && !selectedSemester)) && selectedYear && universityHierarchy.get(selectedUniversity!.id)?.semesters.get(selectedYear.id)?.map(sem => (
+                              <Card key={sem.id} className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
+                                onClick={() => handleSelectSemester(sem)}
+                              >
+                                <CardContent className="p-4 flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-blue-100 p-2 rounded-full text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                      <Book className="h-5 w-5" />
+                                    </div>
+                                    <span className="font-medium">{sem.name}</span>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <Button size="sm" variant="ghost" onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedYearId(selectedYear.id);
+                                      setEditingItem(sem);
+                                      setSemesterDialogOpen(true);
+                                    }}><Edit className="h-4 w-4" /></Button>
+                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteConfirm({ type: 'semester', id: sem.id });
+                                    }}><Trash2 className="h-4 w-4" /></Button>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+
+                            {(viewLevel === 'semesters' || viewLevel === 'subjects') && selectedSemester && universityHierarchy.get(selectedUniversity!.id)?.subjects.get(selectedSemester.id)?.map(sub => (
+                              <Card key={sub.id} className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group">
+                                <CardContent className="p-4 flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-blue-100 p-2 rounded-full text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                      <BookOpen className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                      <span className="font-medium block">{sub.name}</span>
+                                      <span className="text-xs text-muted-foreground">{sub.code} • {sub.credits} Credits</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <Button size="sm" variant="ghost" onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingItem(sub);
+                                      setSubjectDialogOpen(true);
+                                    }}><Edit className="h-4 w-4" /></Button>
+                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteConfirm({ type: 'subject', id: sub.id });
+                                    }}><Trash2 className="h-4 w-4" /></Button>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
                           </div>
                         </CardContent>
-                      </Card>
-                    ))
-                  ) : (
-                    universities.map((uni) => (
-                      <Card key={uni.id}>
-                        <CardContent className="flex items-center justify-between p-4">
-                          <div>
-                            <h4 className="font-semibold">{uni.name}</h4>
-                            <p className="text-sm text-muted-foreground">{uni.description || "No description"}</p>
-                            <p className="text-xs text-muted-foreground">Order: {uni.display_order}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditingItem(uni);
-                                setTimeout(() => {
-                                  setUniversityDialogOpen(true);
-                                }, 0);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => setDeleteConfirm({ type: "university", id: uni.id })}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
-                  )}
-                  {universities.length === 0 && (
-                    <p className="text-center text-muted-foreground py-8">No universities found. Create one to get started!</p>
-                  )}
+                      </>
+                    )}
+                  </Card>
                 </div>
               </TabsContent>
             </Tabs>
@@ -1694,9 +2644,14 @@ const Admin = () => {
                 if (deleteConfirm?.type === "category") handleDeleteCategory();
                 else if (deleteConfirm?.type === "class") handleDeleteClass();
                 else if (deleteConfirm?.type === "subject") handleDeleteSubject();
+                else if (deleteConfirm?.type === "class_subject") handleClassSubjectDelete();
                 else if (deleteConfirm?.type === "material") handleDeleteMaterial();
                 else if (deleteConfirm?.type === "notification") handleDeleteNotification();
                 else if (deleteConfirm?.type === "university") handleDeleteUniversity();
+                else if (deleteConfirm?.type === "degree") handleDeleteDegree();
+                else if (deleteConfirm?.type === "branch") handleDeleteBranch();
+                else if (deleteConfirm?.type === "year") handleDeleteYear();
+                else if (deleteConfirm?.type === "semester") handleDeleteSemester();
               }}
             >
               Delete

@@ -1,5 +1,6 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 
 interface SelectionCardProps {
     title: string;
@@ -17,35 +18,35 @@ const SelectionCard: React.FC<SelectionCardProps> = ({
     color = "blue"
 }) => {
     const colorClasses = {
-        blue: "bg-blue-50 text-blue-600 group-hover:bg-blue-100",
-        purple: "bg-purple-50 text-purple-600 group-hover:bg-purple-100",
-        green: "bg-green-50 text-green-600 group-hover:bg-green-100",
-        orange: "bg-orange-50 text-orange-600 group-hover:bg-orange-100",
+        blue: "from-primary/20 to-primary/5 text-primary",
+        purple: "from-accent/20 to-accent/5 text-accent",
+        green: "from-secondary/20 to-secondary/5 text-secondary",
+        orange: "from-orange-500/20 to-orange-500/5 text-orange-600 dark:text-orange-400",
     };
 
     const selectedColorClass = colorClasses[color as keyof typeof colorClasses] || colorClasses.blue;
 
     return (
-        <div
+        <Card
             onClick={onClick}
-            className="group bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-100 hover:border-blue-200 flex flex-col items-center text-center gap-4"
+            className="group glass-card hover-lift cursor-pointer p-6 flex flex-col items-center text-center gap-4 animate-fade-in-up border-border/50 hover:border-primary/30 transition-all duration-300"
         >
             {Icon && (
-                <div className={`p-4 rounded-full transition-colors duration-300 ${selectedColorClass}`}>
-                    <Icon size={32} />
+                <div className={`p-4 rounded-2xl bg-gradient-to-br ${selectedColorClass} transition-all duration-300 group-hover:scale-110 shadow-lg`}>
+                    <Icon size={32} className="transition-transform duration-300 group-hover:rotate-6" />
                 </div>
             )}
             <div>
-                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors duration-300">
                     {title}
                 </h3>
                 {subtitle && (
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-muted-foreground mt-1">
                         {subtitle}
                     </p>
                 )}
             </div>
-        </div>
+        </Card>
     );
 };
 
