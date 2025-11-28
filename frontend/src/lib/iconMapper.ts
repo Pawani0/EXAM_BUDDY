@@ -30,7 +30,7 @@ export const subjectIcons: Record<string, LucideIcon> = {
   Hindi: Icons.Languages,
   History: Icons.Book,
   Geography: Icons.Globe,
-  "Computer Science": Icons.Book,
+  ComputerScience: Icons.Book,
   Calculator: Icons.Calculator,
   Book: Icons.Book,
 };

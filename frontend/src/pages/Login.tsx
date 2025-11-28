@@ -51,8 +51,18 @@ const Login = () => {
       const user = await response.json();
       setUser(user);
 
-  toast.success("Login successful! Redirecting...");
-  setTimeout(() => navigate("/student"), 1200);
+      toast.success("Login successful! Redirecting...");
+
+      // Dynamic redirection based on role
+      setTimeout(() => {
+        if (user.role === "admin") {
+          navigate("/admin");
+        } else if (user.role === "teacher") {
+          navigate("/teacher");
+        } else {
+          navigate("/student");
+        }
+      }, 1200);
     } catch (error) {
       console.error("Login failed", error);
       toast.error("We couldn't reach the server. Please try again later.");
@@ -69,7 +79,7 @@ const Login = () => {
         <div className="relative overflow-hidden glass-card rounded-3xl p-8">
           <div className="absolute -top-20 -right-20 h-60 w-60 rounded-full bg-primary/30 blur-3xl" />
           <div className="absolute -bottom-20 -left-20 h-60 w-60 rounded-full bg-secondary/20 blur-3xl" />
-          
+
           <div className="relative">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-foreground mb-2">Welcome Back</h1>

@@ -1,7 +1,8 @@
+import logo from "@/assets/logo.jpg";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BookOpen, LogIn, UserPlus, ArrowLeft, User, Home, LogOut, Settings } from "lucide-react";
+import { LogIn, UserPlus, ArrowLeft, User, Home, LogOut, GraduationCap } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
 
 interface HeaderProps {
@@ -38,8 +39,8 @@ export const Header = ({
     <header className="w-full py-4 px-6 animate-fade-in">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-            <BookOpen className="h-6 w-6 text-primary-foreground" />
+          <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 overflow-hidden">
+            <img src={logo} alt="Exam Buddy Logo" className="h-full w-full object-cover" />
           </div>
           <div>
             <h1 className="text-2xl font-bold gradient-text">Exam Buddy</h1>
@@ -62,20 +63,32 @@ export const Header = ({
           {shouldShowStudentActions && (
             studentActionVariant === "dashboard" ? (
               <>
+                {/* Role-based Dashboard Link */}
                 <Button variant="outline" asChild className="gap-2">
-                  <Link to="/student">
+                  <Link to={user?.role === "teacher" ? "/teacher" : user?.role === "admin" ? "/admin" : "/student"}>
                     <User className="h-4 w-4" />
                     Dashboard
                   </Link>
                 </Button>
+
+                {/* Admin Access to All Dashboards */}
                 {user?.role === "admin" && (
-                  <Button variant="outline" asChild className="gap-2">
-                    <Link to="/admin">
-                      <Settings className="h-4 w-4" />
-                      Admin
-                    </Link>
-                  </Button>
+                  <>
+                    <Button variant="outline" asChild className="gap-2">
+                      <Link to="/student">
+                        <User className="h-4 w-4" />
+                        Student View
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild className="gap-2">
+                      <Link to="/teacher">
+                        <GraduationCap className="h-4 w-4" />
+                        Teacher View
+                      </Link>
+                    </Button>
+                  </>
                 )}
+
                 <Button variant="ghost" className="gap-2" onClick={handleLogoutClick}>
                   <LogOut className="h-4 w-4" />
                   Logout
@@ -89,14 +102,15 @@ export const Header = ({
                     Home
                   </Link>
                 </Button>
-                {user?.role === "admin" && (
-                  <Button variant="outline" asChild className="gap-2">
-                    <Link to="/admin">
-                      <Settings className="h-4 w-4" />
-                      Admin
-                    </Link>
-                  </Button>
-                )}
+
+                {/* Role-based Dashboard Link */}
+                <Button variant="outline" asChild className="gap-2">
+                  <Link to={user?.role === "teacher" ? "/teacher" : user?.role === "admin" ? "/admin" : "/student"}>
+                    <User className="h-4 w-4" />
+                    Dashboard
+                  </Link>
+                </Button>
+
                 <Button variant="ghost" className="gap-2" onClick={handleLogoutClick}>
                   <LogOut className="h-4 w-4" />
                   Logout
@@ -111,7 +125,7 @@ export const Header = ({
                 asChild
                 className="gap-2"
               >
-                <Link to="/student">
+                <Link to={user?.role === "teacher" ? "/teacher" : user?.role === "admin" ? "/admin" : "/student"}>
                   <User className="h-4 w-4" />
                   Dashboard
                 </Link>

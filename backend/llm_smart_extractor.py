@@ -160,3 +160,106 @@ Return ONLY the JSON object. No explanations, no extra text.
     except Exception as e:
         print("LLM batch classification failed:", e)
         return {q: ["unknown"] for q in questions}
+
+def generate_question_bank(topic: str, quantity: int = 5, difficulty: str = "Medium") -> list:
+    """
+    Generate practice questions and answers for a given topic.
+    """
+    prompt = f"""
+    You are an expert academic content generator.
+    
+    Task: Generate {quantity} practice questions with detailed answers for the topic: "{topic}".
+    Difficulty Level: {difficulty}
+    
+    Output Format:
+    Return a valid JSON list of objects. Each object must have:
+    - "question": The question text.
+    - "answer": A detailed answer/explanation.
+    - "type": "Conceptual", "Numerical", or "Theoretical" based on the question.
+    
+    Example:
+    [
+        {{
+            "question": "What is a class in OOP?",
+            "answer": "A class is a blueprint for creating objects...",
+            "type": "Theoretical"
+        }}
+    ]
+    
+    Return ONLY the JSON list.
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        
+        raw_content = response.choices[0].message.content.strip()
+        match = re.search(r"\[.*\]", raw_content, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        return []
+        
+    except Exception as e:
+        print(f"Error generating question bank: {e}")
+        return []
+
+
+def generate_assignment(topics: list, blooms_level: str, question_types: list, quantity: int = 5) -> dict:
+    """
+    Generate an assignment based on Bloom's Taxonomy.
+    """
+    prompt = f"""
+    You are an expert curriculum designer. Create an assignment for students.
+    
+    Topics: {', '.join(topics)}
+    Bloom's Taxonomy Level: {blooms_level} (Focus on verbs like {get_blooms_verbs(blooms_level)})
+    Question Types: {', '.join(question_types)}
+    Total Questions: {quantity}
+    
+    Task:
+    Generate {quantity} questions that test the students' understanding at the "{blooms_level}" level.
+    Ensure a mix of the requested question types.
+    
+    Output Format:
+    Return a valid JSON object with:
+    - "title": A suitable title for the assignment.
+    - "questions": A list of objects, each containing:
+        - "id": 1, 2, ...
+        - "question": The question text.
+        - "marks": Suggested marks (e.g., 2, 5, 10).
+        - "blooms_level": The specific cognitive level targeted.
+    
+    Return ONLY the JSON object.
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        
+        raw_content = response.choices[0].message.content.strip()
+        # Try to find JSON object
+        match = re.search(r"\{.*\}", raw_content, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        return {}
+        
+    except Exception as e:
+        print(f"Error generating assignment: {e}")
+        return {}
+
+def get_blooms_verbs(level: str) -> str:
+    verbs = {
+        "Remember": "define, list, recall, repeat",
+        "Understand": "classify, describe, discuss, explain",
+        "Apply": "demonstrate, interpret, operate, solve",
+        "Analyze": "compare, contrast, examine, question",
+        "Evaluate": "argue, defend, judge, select",
+        "Create": "assemble, construct, design, develop"
+    }
+    return verbs.get(level, "relevant verbs")

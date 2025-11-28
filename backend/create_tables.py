@@ -5,7 +5,7 @@ Run this script to initialize the database schema.
 import os
 from dotenv import load_dotenv
 from database import Base, engine
-from models import User, Category, Class, Subject, Material
+from models import User, Category, Class, Subject, Material, Notification, University, Degree, Branch, Year, Semester
 
 load_dotenv()
 
@@ -21,6 +21,12 @@ def create_tables():
         print("  - classes")
         print("  - subjects")
         print("  - materials")
+        print("  - notifications")
+        print("  - universities")
+        print("  - degrees")
+        print("  - branches")
+        print("  - years")
+        print("  - semesters")
     except Exception as e:
         print(f"❌ Error creating tables: {e}")
         raise

@@ -1,38 +1,60 @@
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, ListFlowable, ListItem
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 def generate_pdf(clustered_data, filename="Clustered_Questions.pdf"):
-    doc = SimpleDocTemplate(filename, pagesize=A4,
-                            rightMargin=40, leftMargin=40,
-                            topMargin=60, bottomMargin=40)
-
-    styles = getSampleStyleSheet()
+    doc = SimpleDocTemplate(filename, pagesize=A4)
     story = []
+    styles = getSampleStyleSheet()
 
-    # Custom styles
-    unit_style = ParagraphStyle(name='UnitStyle', parent=styles['Heading1'], fontSize=18, spaceAfter=12)
-    topic_style = ParagraphStyle(name='TopicStyle', parent=styles['Heading2'], fontSize=14, spaceAfter=6, leftIndent=12)
-    question_style = ParagraphStyle(name='QuestionStyle', parent=styles['Normal'], fontSize=12, leftIndent=24, spaceAfter=4)
+    # Custom Styles
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        alignment=TA_CENTER,
+        spaceAfter=20
+    )
+    unit_style = ParagraphStyle(
+        'Unit',
+        parent=styles['Heading2'],
+        spaceBefore=15,
+        spaceAfter=10
+    )
+    topic_style = ParagraphStyle(
+        'Topic',
+        parent=styles['Heading3'],
+        spaceBefore=10,
+        spaceAfter=5
+    )
+    question_style = ParagraphStyle(
+        'Question',
+        parent=styles['BodyText'],
+        leftIndent=20
+    )
+
+    story.append(Paragraph("Clustered Questions Report", title_style))
+    story.append(Spacer(1, 12))
 
     for unit_name, topics in clustered_data.items():
-        # Unit heading
+        # Unit Heading
         story.append(Paragraph(unit_name, unit_style))
         story.append(Spacer(1, 6))
 
         for topic_name, questions in topics.items():
             if not questions:
                 continue  # skip topics with no questions
+            
             # Topic subheading
             story.append(Paragraph(topic_name, topic_style))
+            
             # List of questions
             question_items = [ListItem(Paragraph(q, question_style)) for q in questions]
-            story.append(ListFlowable(question_items, bulletType='1'))  # numbered list
+            story.append(ListFlowable(question_items, bulletType='1', start=1))  # numbered list
             story.append(Spacer(1, 12))
         
-        # Page break after each unit
+        # Page break after each unit (optional, can remove if not needed)
         story.append(PageBreak())
 
-    # Build PDF
     doc.build(story)
-    print(f"PDF generated: {filename}")
+    return filename

@@ -19,7 +19,7 @@ const gradients = [
 
 export const SubjectCard = ({ name, icon: Icon, color, onClick }: SubjectCardProps) => {
   const randomGradient = gradients[Math.floor(Math.random() * gradients.length)];
-  
+
   return (
     <div className="group glass-card rounded-2xl p-6 hover-lift animate-scale-in border-2 border-transparent hover:border-primary/30">
       <div className="flex items-start gap-4">
@@ -28,13 +28,13 @@ export const SubjectCard = ({ name, icon: Icon, color, onClick }: SubjectCardPro
         >
           <Icon className="h-7 w-7 text-primary-foreground" />
         </div>
-        
+
         <div className="flex-1">
           <h3 className="text-xl font-semibold text-foreground mb-3 group-hover:gradient-text transition-all">{name}</h3>
           <Button
             onClick={onClick}
             size="sm"
-            className="w-full shine-effect bg-gradient-to-r from-primary via-accent to-secondary hover:opacity-90 text-primary-foreground font-semibold border-0 shadow-md"
+            className="w-full shine-effect bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-primary-foreground font-semibold border-0 shadow-md"
           >
             View Resources
           </Button>

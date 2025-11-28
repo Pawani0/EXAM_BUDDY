@@ -86,4 +86,17 @@ def cluster_questions(syllabus_json: list, questions_list: list, threshold: floa
             if t in topic_to_unit:  # safety check
                 clustered[topic_to_unit[t]][t].append(q)
 
-    return clustered
+    # -------------------------
+    # Calculate Topic Importance (Frequency)
+    # -------------------------
+    importance = {}
+    for unit, topics in clustered.items():
+        for topic, questions in topics.items():
+            count = len(questions)
+            if count > 0:
+                importance[topic] = count
+    
+    # Sort importance by count descending
+    importance = dict(sorted(importance.items(), key=lambda item: item[1], reverse=True))
+
+    return clustered, importance

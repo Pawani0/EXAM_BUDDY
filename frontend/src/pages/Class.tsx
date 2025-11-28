@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { SubjectCard } from "@/components/SubjectCard";
@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Book } from "lucide-react";
 import { toast } from "sonner";
 import { getIcon, subjectIcons } from "@/lib/iconMapper";
+import { useClassData } from "@/hooks/useClassData";
+
+import { Skeleton } from "@/components/ui/skeleton";
 
 const subjectColors = [
   "bg-blue-500/20",
@@ -35,38 +38,14 @@ interface ClassData {
 const Class = () => {
   const { classId, className } = useParams();
   const navigate = useNavigate();
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
-  
-  const [classData, setClassData] = useState<ClassData | null>(null);
-  const [loading, setLoading] = useState(true);
-  
+
+  const { data: classData, isLoading: loading, error } = useClassData(classId);
+
   const displayName = className?.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()) || classData?.name || "Class";
 
-  useEffect(() => {
-    if (classId) {
-      loadClassData(parseInt(classId));
-    } else {
-      // Fallback: try to find class by name if no ID provided
-      toast.error("Class ID is required");
-      setLoading(false);
-    }
-  }, [classId]);
-
-  const loadClassData = async (id: number) => {
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/classes/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setClassData(data);
-      } else {
-        toast.error("Failed to load class data");
-      }
-    } catch (error) {
-      toast.error("Failed to load class data");
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (error) {
+    toast.error("Failed to load class data");
+  }
 
   const handleSubjectClick = (subject: Subject) => {
     const subjectSlug = subject.name.toLowerCase().replace(/\s+/g, "-");
@@ -86,7 +65,7 @@ const Class = () => {
         <div className="relative overflow-hidden glass-card rounded-[2.5rem] p-12 border-2 border-border/50">
           <div className="absolute -top-24 -right-24 h-80 w-80 rounded-full bg-gradient-to-br from-primary/20 to-transparent blur-3xl" />
           <div className="absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-secondary/20 blur-3xl" />
-          
+
           <div className="relative">
             <div className="inline-block px-4 py-2 rounded-full bg-primary/20 text-primary border border-primary/30 text-sm font-bold mb-4">
               {displayName}
@@ -107,8 +86,16 @@ const Class = () => {
         <div className="glass-card rounded-3xl p-8 animate-scale-in">
           <h2 className="text-3xl font-bold text-foreground mb-8">Subjects</h2>
           {loading ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Loading subjects...</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="glass-card p-6 rounded-2xl h-[180px] flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <Skeleton className="h-12 w-12 rounded-xl" />
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                  </div>
+                  <Skeleton className="h-6 w-1/2" />
+                </div>
+              ))}
             </div>
           ) : classData && classData.subjects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -117,7 +104,7 @@ const Class = () => {
                   ? getIcon(subject.icon_name, subjectIcons[subject.name] || Book)
                   : (subjectIcons[subject.name] || Book);
                 const color = subjectColors[index % subjectColors.length];
-                
+
                 return (
                   <SubjectCard
                     key={subject.id}

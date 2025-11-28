@@ -10,9 +10,21 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
 import Student from "./pages/Student";
+import Teacher from "./pages/Teacher";
 import Admin from "./pages/Admin";
+import UniversityFlow from "./pages/UniversityFlow";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes default stale time
+      gcTime: 1000 * 60 * 30, // 30 minutes garbage collection time
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -23,11 +35,35 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/class/:classId/:className" element={<Class />} />
+          <Route path="/class/:classId" element={<Class />} />
           <Route path="/class/:classId/resources/:subject" element={<Resources />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/student" element={<Student />} />
-          <Route path="/admin" element={<Admin />} />
+          <Route
+            path="/student"
+            element={
+              <ProtectedRoute allowedRoles={["student", "admin"]}>
+                <Student />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teacher"
+            element={
+              <ProtectedRoute allowedRoles={["teacher", "admin"]}>
+                <Teacher />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <Admin />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/university" element={<UniversityFlow />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
