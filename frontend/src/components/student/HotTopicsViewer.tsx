@@ -8,7 +8,11 @@ interface HotTopicsViewerProps {
 }
 
 export const HotTopicsViewer = ({ hotTopics, importance }: HotTopicsViewerProps) => {
-    const maxImportance = Math.max(...Object.values(importance));
+    // Handle null/undefined importance object
+    const importanceValues = importance && typeof importance === 'object' 
+        ? Object.values(importance) 
+        : [];
+    const maxImportance = importanceValues.length > 0 ? Math.max(...importanceValues) : 1;
 
     return (
         <Card className="border-orange-500/20 bg-orange-500/5 backdrop-blur-sm">

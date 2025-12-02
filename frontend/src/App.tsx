@@ -14,6 +14,10 @@ import QuestionClustering from "./pages/QuestionClustering";
 import HotTopicExtraction from "./pages/HotTopicExtraction";
 import PracticePaperGeneration from "./pages/PracticePaperGeneration";
 import Teacher from "./pages/Teacher";
+import HotTopicsExtraction from "./pages/teacher/HotTopicsExtraction";
+import QuestionBankGenerator from "./pages/teacher/QuestionBankGenerator";
+import AssignmentGenerator from "./pages/teacher/AssignmentGenerator";
+import COPOMapping from "./pages/teacher/COPOMapping";
 import Admin from "./pages/Admin";
 import UniversityFlow from "./pages/UniversityFlow";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -79,6 +83,38 @@ const App = () => (
             element={
               <ProtectedRoute allowedRoles={["teacher", "admin"]}>
                 <Teacher />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teacher/hot-topics"
+            element={
+              <ProtectedRoute allowedRoles={["teacher", "admin"]}>
+                <HotTopicsExtraction />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teacher/question-bank"
+            element={
+              <ProtectedRoute allowedRoles={["teacher", "admin"]}>
+                <QuestionBankGenerator />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teacher/assignment"
+            element={
+              <ProtectedRoute allowedRoles={["teacher", "admin"]}>
+                <AssignmentGenerator />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teacher/co-po"
+            element={
+              <ProtectedRoute allowedRoles={["teacher", "admin"]}>
+                <COPOMapping />
               </ProtectedRoute>
             }
           />

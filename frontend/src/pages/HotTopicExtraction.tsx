@@ -65,42 +65,28 @@ const HotTopicExtraction = () => {
         setIsProcessing(true);
 
         try {
-            // Extract syllabus
-            const syllabusFormData = new FormData();
-            syllabusFormData.append("file", syllabusFile[0]);
-            const syllabusRes = await fetch(`${apiBaseUrl}/extract_syllabus/`, {
-                method: "POST",
-                body: syllabusFormData,
-            });
-            if (!syllabusRes.ok) throw new Error("Failed to extract syllabus");
-            const syllabusData = await syllabusRes.json();
-
-            // Extract questions
-            let allQuestions: string[] = [];
+            // Create FormData with all files
+            const formData = new FormData();
+            formData.append("syllabus", syllabusFile[0]);
+            
+            // Append all PYQ files
             for (const file of pyqFiles) {
-                const fd = new FormData();
-                fd.append("file", file);
-                const res = await fetch(`${apiBaseUrl}/extract_questions/`, {
-                    method: "POST",
-                    body: fd,
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.questions) allQuestions = [...allQuestions, ...data.questions];
-                }
+                formData.append("pyq_files", file);
             }
 
             // Extract hot topics
             const hotTopicsRes = await fetch(`${apiBaseUrl}/student/hot-topics`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json", "X-User-Id": String(user.id) },
-                body: JSON.stringify({ syllabus: syllabusData, questions: allQuestions }),
+                headers: { "X-User-Id": String(user.id) },
+                body: formData,
             });
 
             if (hotTopicsRes.ok) {
                 const data = await hotTopicsRes.json();
-                setHotTopics(data.hot_topics);
-                setImportance(data.importance);
+                // hot_topics is an object with topic names as keys and counts as values
+                const topicNames = Object.keys(data.hot_topics);
+                setHotTopics(topicNames);
+                setImportance(data.hot_topics);
                 toast.success("Hot topics extracted successfully!");
                 await refreshUser();
             } else {

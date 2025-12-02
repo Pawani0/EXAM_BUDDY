@@ -44,6 +44,7 @@ class UserResponse(BaseModel):
     full_name: str
     email: EmailStr
     role: Literal["student", "teacher", "admin"]
+    trial_used: Optional[int] = 0
 
     class Config:
         from_attributes = True
@@ -202,6 +203,15 @@ def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
     return UserResponse.model_validate(user)
 
 
+@app.get("/users/{user_id}", response_model=UserResponse)
+@app.get("/auth/user/{user_id}", response_model=UserResponse)
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserResponse.model_validate(user)
+
+
 @app.post("/pyq/cluster", response_model=ClusterResponse)
 def cluster_pyq_questions(payload: ClusterRequest):
     if not payload.syllabus:
@@ -257,33 +267,267 @@ async def generate_pdf_endpoint(payload: PDFRequest):
 # ==================== TEACHER API ENDPOINTS ====================
 
 class QuestionBankRequest(BaseModel):
-    topic: str = Field(..., min_length=1, max_length=255)
+    unit: str = Field(..., min_length=1, max_length=255)
+    topics: str = Field(..., min_length=1)
     quantity: int = Field(default=5, ge=1, le=20)
-    difficulty: Literal["Easy", "Medium", "Hard"] = "Medium"
+    blooms_level: Literal["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"] = "Apply"
 
 
 class AssignmentRequest(BaseModel):
-    topics: List[str] = Field(..., min_length=1)
+    unit: str = Field(..., min_length=1, max_length=255)
+    topics: str = Field(..., min_length=1)
     blooms_level: Literal["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"]
-    question_types: List[str] = Field(..., min_length=1)
+    question_types: str = Field(..., min_length=1)
     quantity: int = Field(default=5, ge=1, le=20)
 
 
-@app.post("/teacher/question-bank")
-def create_question_bank(payload: QuestionBankRequest):
+class HotTopicsRequest(BaseModel):
+    pass  # Files will be uploaded as multipart
+
+
+async def increment_trial(user_id: int, db: Session):
+    """Helper to increment user trial count"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        user.trial_used = (user.trial_used or 0) + 1
+        db.commit()
+        db.refresh(user)
+
+
+@app.post("/teacher/extract-units")
+async def extract_units_from_syllabus(
+    syllabus: UploadFile = File(...),
+    user_id: int = Header(..., alias="X-User-Id"),
+    db: Session = Depends(get_db)
+):
+    """Extract units and topics from syllabus PDF"""
     try:
-        questions = generate_question_bank(payload.topic, payload.quantity, payload.difficulty)
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+            content = await syllabus.read()
+            temp_file.write(content)
+            temp_path = temp_file.name
+        
+        # Extract text from PDF
+        text = extract_text_from_pdf(temp_path)
+        cleaned = clean_text(text)
+        
+        # Extract units using LLM
+        units = ext_syll(cleaned)
+        
+        # Clean up temp file
+        os.remove(temp_path)
+        
+        return {"units": units}
+        
+    except Exception as e:
+        logging.error("Error extracting units: %s", str(e))
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise HTTPException(status_code=500, detail=f"Failed to extract units: {str(e)}")
+
+
+@app.post("/teacher/hot-topics")
+async def extract_hot_topics(
+    syllabus: UploadFile = File(...),
+    pyq_files: List[UploadFile] = File(...),
+    user_id: int = Header(..., alias="X-User-Id"),
+    db: Session = Depends(get_db)
+):
+    """Extract hot topics from syllabus and PYQ files"""
+    try:
+        # Check trial limit
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if user.role == "teacher" and (user.trial_used or 0) >= 3:
+            raise HTTPException(status_code=403, detail="Trial limit reached")
+        
+        # Save syllabus temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+            content = await syllabus.read()
+            temp_file.write(content)
+            syllabus_path = temp_file.name
+        
+        # Extract syllabus text
+        syllabus_text = extract_text_from_pdf(syllabus_path)
+        cleaned_syllabus = clean_text(syllabus_text)
+        
+        # Extract units from syllabus
+        units = ext_syll(cleaned_syllabus)
+        
+        # Extract questions from PYQ files
+        all_questions = []
+        pyq_paths = []
+        
+        for pyq_file in pyq_files:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                content = await pyq_file.read()
+                temp_file.write(content)
+                pyq_path = temp_file.name
+                pyq_paths.append(pyq_path)
+            
+            # Extract questions from PDF
+            pyq_text = extract_text_from_pdf(pyq_path)
+            questions = llm_questions_extraction(pyq_text)
+            all_questions.extend(questions)
+            logging.info(f"Extracted {len(questions)} questions from {pyq_file.filename}")
+        
+        # Cluster questions by topics
+        clusters, importance = cluster_questions(units, all_questions, threshold=0.65)
+        
+        # Clean up temp files
+        os.remove(syllabus_path)
+        for path in pyq_paths:
+            os.remove(path)
+        
+        # Increment trial count
+        await increment_trial(user_id, db)
+        
+        return {
+            "hot_topics": importance,
+            "clusters": clusters
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        logging.error("Error extracting hot topics: %s", str(e))
+        logging.error("Traceback: %s", traceback.format_exc())
+        # Clean up temp files on error
+        if 'syllabus_path' in locals() and os.path.exists(syllabus_path):
+            os.remove(syllabus_path)
+        if 'pyq_paths' in locals():
+            for path in pyq_paths:
+                if os.path.exists(path):
+                    os.remove(path)
+        raise HTTPException(status_code=500, detail=f"Failed to extract hot topics: {str(e)}")
+
+
+@app.post("/student/hot-topics")
+async def extract_hot_topics_student(
+    syllabus: UploadFile = File(...),
+    pyq_files: List[UploadFile] = File(...),
+    user_id: int = Header(..., alias="X-User-Id"),
+    db: Session = Depends(get_db)
+):
+    """Extract hot topics from syllabus and PYQ files for students"""
+    # Same implementation as teacher endpoint
+    return await extract_hot_topics(syllabus, pyq_files, user_id, db)
+
+
+class PracticePaperRequest(BaseModel):
+    syllabus: List[dict]
+    difficulty: str = Field(default="Medium")
+    quantity: int = Field(default=10, ge=1, le=30)
+
+
+@app.post("/student/practice-paper")
+async def generate_student_practice_paper(
+    payload: PracticePaperRequest,
+    user_id: int = Header(..., alias="X-User-Id"),
+    db: Session = Depends(get_db)
+):
+    """Generate practice paper for students based on selected syllabus units"""
+    try:
+        from llm_smart_extractor import generate_practice_paper
+        
+        # Check trial limit for students
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if user.role == "student" and (user.trial_used or 0) >= 3:
+            raise HTTPException(status_code=403, detail="Trial limit reached")
+        
+        # Extract topics from selected units
+        all_topics = []
+        for unit in payload.syllabus:
+            if "topics" in unit and isinstance(unit["topics"], list):
+                all_topics.extend(unit["topics"])
+        
+        if not all_topics:
+            raise HTTPException(status_code=400, detail="No topics found in selected units")
+        
+        # Generate practice paper
+        paper = generate_practice_paper(
+            syllabus_topics=all_topics,
+            hot_topics=None,
+            difficulty=payload.difficulty,
+            quantity=payload.quantity
+        )
+        
+        if not paper:
+            raise HTTPException(status_code=500, detail="Failed to generate practice paper")
+        
+        # Increment trial count
+        await increment_trial(user_id, db)
+        
+        return paper
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        logging.error("Error generating practice paper: %s", str(e))
+        logging.error("Traceback: %s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to generate practice paper: {str(e)}")
+
+
+@app.post("/teacher/question-bank")
+async def create_question_bank(
+    payload: QuestionBankRequest,
+    user_id: int = Header(..., alias="X-User-Id"),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Check trial limit
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if user.role == "teacher" and (user.trial_used or 0) >= 3:
+            raise HTTPException(status_code=403, detail="Trial limit reached")
+        
+        questions = generate_question_bank(payload.topics, payload.quantity, "Medium")
+        
+        # Increment trial count
+        await increment_trial(user_id, db)
+        
         return {"questions": questions}
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error("Error generating question bank: %s", str(e))
         raise HTTPException(status_code=500, detail="Failed to generate question bank")
 
 
 @app.post("/teacher/assignment")
-def create_assignment(payload: AssignmentRequest):
+async def create_assignment(
+    payload: AssignmentRequest,
+    user_id: int = Header(..., alias="X-User-Id"),
+    db: Session = Depends(get_db)
+):
     try:
-        assignment = generate_assignment(payload.topics, payload.blooms_level, payload.question_types, payload.quantity)
+        # Check trial limit
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if user.role == "teacher" and (user.trial_used or 0) >= 3:
+            raise HTTPException(status_code=403, detail="Trial limit reached")
+        
+        topics_list = [t.strip() for t in payload.topics.split(",")]
+        assignment = generate_assignment(topics_list, payload.blooms_level, [payload.question_types], payload.quantity)
+        
+        # Increment trial count
+        await increment_trial(user_id, db)
+        
         return assignment
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error("Error generating assignment: %s", str(e))
         raise HTTPException(status_code=500, detail="Failed to generate assignment")

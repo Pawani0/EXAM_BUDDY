@@ -181,7 +181,7 @@ const PracticePaperGeneration = () => {
                         </p>
                     </div>
 
-                    {!generatedPaper ? (
+                    {syllabusUnits.length === 0 && !generatedPaper && (
                         <>
                             <FileUploadCard
                                 title="Upload Syllabus"
@@ -192,65 +192,67 @@ const PracticePaperGeneration = () => {
                                 onFilesSelected={setSyllabusFile}
                             />
 
-                            {syllabusFile.length > 0 && syllabusUnits.length === 0 && (
+                            {syllabusFile.length > 0 && (
                                 <Button onClick={handleSyllabusUpload} className="w-full">
                                     Extract Syllabus
                                 </Button>
                             )}
-
-                            {syllabusUnits.length > 0 && (
-                                <>
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle>Paper Configuration</CardTitle>
-                                            <CardDescription>Customize your practice paper settings</CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="space-y-6">
-                                            <div className="space-y-2">
-                                                <Label>Difficulty Level</Label>
-                                                <Select value={difficulty} onValueChange={setDifficulty}>
-                                                    <SelectTrigger>
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="Easy">Easy</SelectItem>
-                                                        <SelectItem value="Medium">Medium</SelectItem>
-                                                        <SelectItem value="Hard">Hard</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <Label>Number of Questions: {quantity[0]}</Label>
-                                                <Slider
-                                                    value={quantity}
-                                                    onValueChange={setQuantity}
-                                                    min={5}
-                                                    max={50}
-                                                    step={5}
-                                                    className="py-4"
-                                                />
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <UnitSelector units={syllabusUnits} onSelectionChange={setSelectedUnits} />
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-
-                                    <Button
-                                        className="w-full h-12 text-lg"
-                                        onClick={handleGenerate}
-                                        disabled={isProcessing || selectedUnits.length === 0}
-                                    >
-                                        Generate Practice Paper
-                                    </Button>
-
-                                    {isProcessing && <LoadingSpinner message="Generating your practice paper..." />}
-                                </>
-                            )}
                         </>
-                    ) : (
+                    )}
+
+                    {syllabusUnits.length > 0 && !generatedPaper && (
+                        <>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Paper Configuration</CardTitle>
+                                    <CardDescription>Customize your practice paper settings</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="space-y-2">
+                                        <Label>Difficulty Level</Label>
+                                        <Select value={difficulty} onValueChange={setDifficulty}>
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Easy">Easy</SelectItem>
+                                                <SelectItem value="Medium">Medium</SelectItem>
+                                                <SelectItem value="Hard">Hard</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Number of Questions: {quantity[0]}</Label>
+                                        <Slider
+                                            value={quantity}
+                                            onValueChange={setQuantity}
+                                            min={5}
+                                            max={50}
+                                            step={5}
+                                            className="py-4"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <UnitSelector units={syllabusUnits} onSelectionChange={setSelectedUnits} />
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Button
+                                className="w-full h-12 text-lg"
+                                onClick={handleGenerate}
+                                disabled={isProcessing || selectedUnits.length === 0}
+                            >
+                                Generate Practice Paper
+                            </Button>
+
+                            {isProcessing && <LoadingSpinner message="Generating your practice paper..." />}
+                        </>
+                    )}
+
+                    {generatedPaper && (
                         <Card className="bg-background/60 backdrop-blur-md">
                             <CardHeader>
                                 <div className="flex justify-between items-center">
@@ -317,8 +319,6 @@ const PracticePaperGeneration = () => {
                     )}
                 </div>
             </main>
-
-            {isProcessing && <LoadingSpinner message="Generating your practice paper..." />}
         </div>
     );
 };
