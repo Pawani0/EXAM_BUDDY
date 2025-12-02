@@ -20,6 +20,16 @@ interface UnitData {
     topics: string[];
 }
 
+interface Assignment {
+    title: string;
+    questions: {
+        id: number;
+        question: string;
+        marks: number;
+        blooms_level: string;
+    }[];
+}
+
 const AssignmentGenerator = () => {
     const navigate = useNavigate();
     const { user, clearUser, setUser } = useAuth();
@@ -33,7 +43,7 @@ const AssignmentGenerator = () => {
     const [asBlooms, setAsBlooms] = useState("Apply");
     const [asTypes, setAsTypes] = useState("MCQ");
     const [asQuantity, setAsQuantity] = useState("5");
-    const [generatedAssignment, setGeneratedAssignment] = useState("");
+    const [generatedAssignment, setGeneratedAssignment] = useState<Assignment | null>(null);
 
     useEffect(() => {
         if (!user) {
