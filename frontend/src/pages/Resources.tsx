@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { ThemeBackground } from "@/components/student/ThemeBackground";
 import { ArrowLeft, Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -94,8 +95,9 @@ export default function Resources() {
   };
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen p-6 relative overflow-hidden">
+      <ThemeBackground />
+      <div className="max-w-7xl mx-auto space-y-8 relative z-10">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button
@@ -107,7 +109,7 @@ export default function Resources() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-4xl font-bold gradient-text">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
               {subjectName || subject?.replace(/-/g, " ").toUpperCase() || "Subject"} Resources
             </h1>
             <p className="text-muted-foreground mt-2">
@@ -158,7 +160,7 @@ export default function Resources() {
             pyqs.map((pyq, index) => (
               <Card
                 key={pyq.id}
-                className="glass-card p-6 hover-lift animate-scale-in"
+                className="p-6 animate-scale-in border-2 border-border/50 bg-background/80 backdrop-blur-xl hover:scale-[1.01] transition-all duration-200 ease-out hover:shadow-xl hover:shadow-primary/10 hover:border-primary/50 will-change-transform"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 <div className="space-y-4">

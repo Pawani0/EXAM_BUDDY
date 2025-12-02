@@ -9,7 +9,10 @@ import Resources from "./pages/Resources";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
-import Student from "./pages/Student";
+import StudentDashboard from "./pages/StudentDashboard";
+import QuestionClustering from "./pages/QuestionClustering";
+import HotTopicExtraction from "./pages/HotTopicExtraction";
+import PracticePaperGeneration from "./pages/PracticePaperGeneration";
 import Teacher from "./pages/Teacher";
 import Admin from "./pages/Admin";
 import UniversityFlow from "./pages/UniversityFlow";
@@ -43,7 +46,31 @@ const App = () => (
             path="/student"
             element={
               <ProtectedRoute allowedRoles={["student", "admin"]}>
-                <Student />
+                <StudentDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/clustering"
+            element={
+              <ProtectedRoute allowedRoles={["student", "admin"]}>
+                <QuestionClustering />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/hot-topics"
+            element={
+              <ProtectedRoute allowedRoles={["student", "admin"]}>
+                <HotTopicExtraction />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/practice-paper"
+            element={
+              <ProtectedRoute allowedRoles={["student", "admin"]}>
+                <PracticePaperGeneration />
               </ProtectedRoute>
             }
           />

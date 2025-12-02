@@ -8,6 +8,7 @@ export interface AuthUser {
 	full_name: string;
 	email: string;
 	role: Role;
+	trial_used: number;
 }
 
 interface AuthState {

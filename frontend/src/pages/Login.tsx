@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
+import { ThemeBackground } from "@/components/student/ThemeBackground";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,10 +73,11 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative overflow-hidden">
+      <ThemeBackground />
       <Header showAuth={false} />
 
-      <div className="max-w-md mx-auto px-6 py-16 animate-fade-in">
+      <div className="max-w-md mx-auto px-6 py-16 animate-fade-in relative z-10">
         <div className="relative overflow-hidden glass-card rounded-3xl p-8">
           <div className="absolute -top-20 -right-20 h-60 w-60 rounded-full bg-primary/30 blur-3xl" />
           <div className="absolute -bottom-20 -left-20 h-60 w-60 rounded-full bg-secondary/20 blur-3xl" />

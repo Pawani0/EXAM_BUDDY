@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
+import { ThemeBackground } from "@/components/student/ThemeBackground";
 import { SubjectCard } from "@/components/SubjectCard";
 import { Button } from "@/components/ui/button";
 import { Book } from "lucide-react";
@@ -57,12 +58,13 @@ const Class = () => {
   };
 
   return (
-    <div className="min-h-screen pb-16">
+    <div className="min-h-screen pb-16 relative overflow-hidden">
+      <ThemeBackground />
       <Header showBack />
 
       {/* Class Header */}
-      <section className="max-w-7xl mx-auto px-6 py-12 animate-fade-in">
-        <div className="relative overflow-hidden glass-card rounded-[2.5rem] p-12 border-2 border-border/50">
+      <section className="max-w-7xl mx-auto px-6 py-12 animate-fade-in relative z-10">
+        <div className="relative overflow-hidden p-12 border-2 border-border/50 bg-background/80 backdrop-blur-xl rounded-[2.5rem]">
           <div className="absolute -top-24 -right-24 h-80 w-80 rounded-full bg-gradient-to-br from-primary/20 to-transparent blur-3xl" />
           <div className="absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-secondary/20 blur-3xl" />
 
@@ -70,10 +72,10 @@ const Class = () => {
             <div className="inline-block px-4 py-2 rounded-full bg-primary/20 text-primary border border-primary/30 text-sm font-bold mb-4">
               {displayName}
             </div>
-            <h1 className="text-5xl font-extrabold mb-4 text-foreground">
-              Your Learning <span className="gradient-text">Hub</span>
+            <h1 className="text-5xl font-extrabold mb-4 bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+              Your Learning Hub
             </h1>
-            <p className="text-xl text-foreground/80 max-w-2xl">
+            <p className="text-xl text-muted-foreground max-w-2xl">
               Access subjects, syllabus, and previous year question papers for {displayName}.
               Everything you need to excel in your exams.
             </p>
@@ -82,9 +84,9 @@ const Class = () => {
       </section>
 
       {/* Subjects Grid */}
-      <section className="max-w-7xl mx-auto px-6">
-        <div className="glass-card rounded-3xl p-8 animate-scale-in">
-          <h2 className="text-3xl font-bold text-foreground mb-8">Subjects</h2>
+      <section className="max-w-7xl mx-auto px-6 relative z-10">
+        <div className="p-8 animate-scale-in border-2 border-border/50 bg-background/80 backdrop-blur-xl rounded-3xl">
+          <h2 className="text-3xl font-bold mb-8 bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">Subjects</h2>
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {Array.from({ length: 6 }).map((_, i) => (

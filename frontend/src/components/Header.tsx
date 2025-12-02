@@ -103,14 +103,6 @@ export const Header = ({
                   </Link>
                 </Button>
 
-                {/* Role-based Dashboard Link */}
-                <Button variant="outline" asChild className="gap-2">
-                  <Link to={user?.role === "teacher" ? "/teacher" : user?.role === "admin" ? "/admin" : "/student"}>
-                    <User className="h-4 w-4" />
-                    Dashboard
-                  </Link>
-                </Button>
-
                 <Button variant="ghost" className="gap-2" onClick={handleLogoutClick}>
                   <LogOut className="h-4 w-4" />
                   Logout

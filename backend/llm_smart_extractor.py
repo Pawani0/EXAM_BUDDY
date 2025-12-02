@@ -263,3 +263,57 @@ def get_blooms_verbs(level: str) -> str:
         "Create": "assemble, construct, design, develop"
     }
     return verbs.get(level, "relevant verbs")
+
+def generate_practice_paper(syllabus_topics: list, hot_topics: list = None, difficulty: str = "Medium", quantity: int = 10) -> dict:
+    """
+    Generate a complete practice paper based on syllabus and optional hot topics.
+    """
+    hot_topics_str = ", ".join(hot_topics) if hot_topics else "None"
+    
+    prompt = f"""
+    You are an expert exam paper setter.
+    
+    Task: Create a practice exam paper.
+    
+    Syllabus Topics: {', '.join(syllabus_topics)}
+    Hot Topics (High Importance/Frequent in PYQs): {hot_topics_str}
+    Difficulty: {difficulty}
+    Total Questions: {quantity}
+    
+    Instructions:
+    1. If Hot Topics are provided, ensure at least 60% of the questions come from these topics.
+    2. The remaining 40% should cover other syllabus topics to ensure breadth.
+    3. If no Hot Topics are provided, distribute questions evenly across the syllabus.
+    4. Include a mix of Conceptual, Analytical, and Application-based questions.
+    
+    Output Format:
+    Return a valid JSON object with:
+    - "title": "Practice Exam Paper - [Subject Name]" (Infer subject from topics if possible, else generic)
+    - "instructions": List of general instructions.
+    - "sections": List of sections (e.g., Section A: Short Answer, Section B: Long Answer).
+    - "questions": List of objects, each containing:
+        - "id": 1, 2, ...
+        - "question": The question text.
+        - "marks": Suggested marks.
+        - "topic": The topic this question belongs to.
+        - "is_hot_topic": boolean (true if from hot topics).
+    
+    Return ONLY the JSON object.
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        
+        raw_content = response.choices[0].message.content.strip()
+        match = re.search(r"\{.*\}", raw_content, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        return {}
+        
+    except Exception as e:
+        print(f"Error generating practice paper: {e}")
+        return {}

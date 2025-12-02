@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Header } from "@/components/Header";
+import { ThemeBackground } from "@/components/student/ThemeBackground";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -111,18 +112,22 @@ const Teacher = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+        <div className="min-h-screen relative overflow-hidden">
+            <ThemeBackground />
             <Header />
-            <main className="container mx-auto px-4 py-8 max-w-5xl">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Teacher Dashboard</h1>
-                    <p className="text-slate-600 dark:text-slate-400">
-                        Generate educational content using AI-powered tools.
+            <main className="container mx-auto px-4 py-8 max-w-5xl relative z-10">
+                {/* Welcome Section */}
+                <div className="text-center mb-8 space-y-4">
+                    <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+                        Teacher Dashboard
+                    </h1>
+                    <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                        Generate educational content using AI-powered tools
                     </p>
                 </div>
 
                 <Tabs defaultValue="question-bank" className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+                    <TabsList className="grid w-full grid-cols-2 max-w-[400px] mx-auto">
                         <TabsTrigger value="question-bank" className="flex items-center gap-2">
                             <BookOpen className="h-4 w-4" />
                             Question Bank
@@ -136,7 +141,7 @@ const Teacher = () => {
                     {/* QUESTION BANK TAB */}
                     <TabsContent value="question-bank" className="space-y-6">
                         <div className="grid md:grid-cols-3 gap-6">
-                            <Card className="md:col-span-1 h-fit">
+                            <Card className="md:col-span-1 h-fit border-2 border-border/50 bg-background/80 backdrop-blur-xl">
                                 <CardHeader>
                                     <CardTitle>Configuration</CardTitle>
                                     <CardDescription>Set parameters for question generation</CardDescription>
@@ -195,7 +200,7 @@ const Teacher = () => {
                                 </CardContent>
                             </Card>
 
-                            <Card className="md:col-span-2 min-h-[500px]">
+                            <Card className="md:col-span-2 min-h-[500px] border-2 border-border/50 bg-background/80 backdrop-blur-xl">
                                 <CardHeader>
                                     <CardTitle>Generated Questions</CardTitle>
                                     <CardDescription>
@@ -238,7 +243,7 @@ const Teacher = () => {
                     {/* ASSIGNMENT TAB */}
                     <TabsContent value="assignment" className="space-y-6">
                         <div className="grid md:grid-cols-3 gap-6">
-                            <Card className="md:col-span-1 h-fit">
+                            <Card className="md:col-span-1 h-fit border-2 border-border/50 bg-background/80 backdrop-blur-xl">
                                 <CardHeader>
                                     <CardTitle>Assignment Setup</CardTitle>
                                     <CardDescription>Design assignment based on Bloom's Taxonomy</CardDescription>
@@ -311,7 +316,7 @@ const Teacher = () => {
                                 </CardContent>
                             </Card>
 
-                            <Card className="md:col-span-2 min-h-[500px]">
+                            <Card className="md:col-span-2 min-h-[500px] border-2 border-border/50 bg-background/80 backdrop-blur-xl">
                                 <CardHeader>
                                     <CardTitle>Generated Assignment</CardTitle>
                                     <CardDescription>

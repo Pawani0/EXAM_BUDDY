@@ -12,6 +12,7 @@ class User(Base):
     email = Column(String(255), nullable=False, unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False)  # student, teacher, admin
+    trial_used = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -44,74 +45,9 @@ class Class(Base):
 
 
 
-class University(Base):
-    __tablename__ = "universities"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False, unique=True)
-    description = Column(Text, nullable=True)
-    icon_name = Column(String(100), nullable=True)
-    display_order = Column(Integer, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    degrees = relationship("Degree", back_populates="university", cascade="all, delete-orphan", order_by="Degree.display_order")
-
-
-class Degree(Base):
-    __tablename__ = "degrees"
-
-    id = Column(Integer, primary_key=True, index=True)
-    university_id = Column(Integer, ForeignKey("universities.id"), nullable=False, index=True)
-    name = Column(String(255), nullable=False)  # e.g., B.Tech, B.Pharma
-    display_order = Column(Integer, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    university = relationship("University", back_populates="degrees")
-    branches = relationship("Branch", back_populates="degree", cascade="all, delete-orphan", order_by="Branch.display_order")
-
-
-class Branch(Base):
-    __tablename__ = "branches"
-
-    id = Column(Integer, primary_key=True, index=True)
-    degree_id = Column(Integer, ForeignKey("degrees.id"), nullable=False, index=True)
-    name = Column(String(255), nullable=False)  # e.g., CSE, Civil
-    display_order = Column(Integer, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    degree = relationship("Degree", back_populates="branches")
-    years = relationship("Year", back_populates="branch", cascade="all, delete-orphan", order_by="Year.display_order")
-
-
-class Year(Base):
-    __tablename__ = "years"
-
-    id = Column(Integer, primary_key=True, index=True)
-    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False, index=True)
-    name = Column(String(50), nullable=False)  # e.g., "1st Year", "2nd Year"
-    display_order = Column(Integer, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    branch = relationship("Branch", back_populates="years")
-    semesters = relationship("Semester", back_populates="year", cascade="all, delete-orphan", order_by="Semester.display_order")
-
-
-class Semester(Base):
-    __tablename__ = "semesters"
-
-    id = Column(Integer, primary_key=True, index=True)
-    year_id = Column(Integer, ForeignKey("years.id"), nullable=False, index=True)
-    name = Column(String(50), nullable=False)  # e.g., "Semester 1", "Semester 2"
-    display_order = Column(Integer, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    year = relationship("Year", back_populates="semesters")
-    subjects = relationship("Subject", back_populates="semester", cascade="all, delete-orphan", order_by="Subject.display_order")
+# University-related models removed intentionally.
+# If you want to reintroduce the university hierarchy later, re-add
+# University, Degree, Branch, Year, and Semester classes here.
 
 
 class Subject(Base):
@@ -119,7 +55,6 @@ class Subject(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     class_id = Column(Integer, ForeignKey("classes.id"), nullable=True, index=True) # Made nullable
-    semester_id = Column(Integer, ForeignKey("semesters.id"), nullable=True, index=True) # Added
     name = Column(String(255), nullable=False)
     icon_name = Column(String(100), nullable=True)  # e.g., "Calculator", "Book"
     display_order = Column(Integer, default=0)
@@ -127,7 +62,6 @@ class Subject(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     class_obj = relationship("Class", back_populates="subjects")
-    semester = relationship("Semester", back_populates="subjects")
     materials = relationship("Material", back_populates="subject", cascade="all, delete-orphan", order_by="Material.display_order")
 
 

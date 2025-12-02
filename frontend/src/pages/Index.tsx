@@ -2,13 +2,15 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { CategoryCard } from "@/components/CategoryCard";
+import { ThemeBackground } from "@/components/student/ThemeBackground";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, X, AlertCircle, Info, AlertTriangle, GraduationCap } from "lucide-react";
+import { ChevronRight, X, AlertCircle, Info, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/useAuth";
 import { getIcon } from "@/lib/iconMapper";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useCategories, Category } from "@/hooks/useCategories";
+import { Zap, Target, Sparkles } from "lucide-react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNotifications, Notification } from "@/hooks/useNotifications";
@@ -75,7 +77,8 @@ const Index = () => {
   const selectedCategoryData = selectedCategory ? categories.find((cat) => cat.id === selectedCategory.id) : null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative overflow-hidden">
+      <ThemeBackground />
       <Header
         showAuth={!isLoggedIn}
         showStudentActions={isLoggedIn}
@@ -197,10 +200,12 @@ const Index = () => {
       </section>
 
       {/* Categories Section */}
-      <section id="categories" className="max-w-7xl mx-auto px-6 py-16">
-        <div className="mb-12 animate-slide-up">
-          <h2 className="text-4xl font-bold text-foreground mb-4">Choose Your Level</h2>
-          <p className="text-xl text-muted-foreground">Select your category to access relevant study materials</p>
+      <section id="categories" className="max-w-7xl mx-auto px-6 py-16 relative z-10">
+        <div className="mb-12 animate-slide-up text-center">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+            Choose Your Level
+          </h2>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">Select your category to access relevant study materials</p>
         </div>
 
         {categoriesLoading ? (
@@ -228,19 +233,12 @@ const Index = () => {
                   delay={index * 100}
                 />
               ))}
-              <CategoryCard
-                title="Universities"
-                description="Find resources for RGPV and other universities"
-                icon={GraduationCap}
-                onClick={() => navigate('/university')}
-                delay={categories.length * 100}
-                className="md:col-span-2"
-              />
+              {/* Universities feature temporarily removed */}
             </div>
 
             {/* Classes Selection */}
             {selectedCategory && selectedCategory.classes.length > 0 && (
-              <div className="glass-card rounded-3xl p-8 animate-slide-up">
+              <div className="p-8 animate-slide-up border-2 border-border/50 bg-background/80 backdrop-blur-xl rounded-3xl">
                 <h3 className="text-2xl font-bold text-foreground mb-6">
                   Select Your Class - {selectedCategory.title}
                 </h3>
@@ -265,35 +263,58 @@ const Index = () => {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="max-w-7xl mx-auto px-6 py-16">
-        <div className="glass-card rounded-3xl p-12">
-          <h2 className="text-4xl font-bold text-foreground mb-12 text-center">Why Exam Buddy?</h2>
+      <section id="features" className="max-w-7xl mx-auto px-6 py-16 relative z-10">
+        <div className="p-12 border-2 border-border/50 bg-background/80 backdrop-blur-xl rounded-3xl">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 text-center bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+            Why Exam Buddy?
+          </h2>
+          <p className="text-center text-muted-foreground mb-12 text-lg max-w-2xl mx-auto">
+            Experience seamless exam preparation with cutting-edge tools designed for modern learners
+          </p>
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                title: "Previous Year Questions",
-                description: "Access comprehensive collection of PYQs with solutions",
-                icon: "📚",
+                title: "Lightning Fast",
+                description: "Instant access to thousands of PYQs and study materials. No waiting, just learning.",
+                icon: Zap,
+                gradient: "from-yellow-500/20 to-orange-500/20",
+                iconColor: "text-yellow-500",
               },
               {
-                title: "Curated Syllabus",
-                description: "Well-organized curriculum aligned with your board",
-                icon: "📝",
+                title: "Pinpoint Accuracy",
+                description: "AI-powered content curation ensures you study exactly what matters for your exams.",
+                icon: Target,
+                gradient: "from-blue-500/20 to-cyan-500/20",
+                iconColor: "text-blue-500",
               },
               {
-                title: "Smart Organization",
-                description: "Find what you need quickly with intuitive navigation",
-                icon: "🎯",
+                title: "Effortlessly Simple",
+                description: "Intuitive design that feels natural. Find what you need in seconds, not minutes.",
+                icon: Sparkles,
+                gradient: "from-purple-500/20 to-pink-500/20",
+                iconColor: "text-purple-500",
               },
             ].map((feature, index) => (
               <div
                 key={index}
-                className="text-center p-6 rounded-2xl bg-card/20 hover:bg-card/30 transition-all duration-300"
+                className="group relative overflow-hidden text-center p-8 rounded-2xl border-2 border-border/50 bg-background/40 backdrop-blur-sm hover:scale-[1.02] transition-all duration-200 ease-out hover:shadow-xl hover:shadow-primary/10 hover:border-primary/50 will-change-transform"
               >
-                <div className="text-5xl mb-4">{feature.icon}</div>
-                <h3 className="text-xl font-bold text-foreground mb-3">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
+                {/* Gradient Background on Hover */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+                
+                {/* Content */}
+                <div className="relative z-10">
+                  <div className="mx-auto w-16 h-16 mb-6 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-200 ease-out will-change-transform">
+                    <feature.icon className={`h-8 w-8 ${feature.iconColor}`} strokeWidth={2.5} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-foreground mb-3 group-hover:text-primary transition-colors">
+                    {feature.title}
+                  </h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
