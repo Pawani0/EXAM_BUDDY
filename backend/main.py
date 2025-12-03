@@ -8,16 +8,26 @@ from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, subqueryload
-from llm_smart_extractor import llm_syllabus_extraction as ext_syll, generate_question_bank, generate_assignment, llm_questions_extraction
-from text_extractor import extract_text_from_pdf, clean_text
+from services.llm_smart_extractor import (
+    llm_syllabus_extraction as ext_syll, 
+    generate_question_bank, 
+    generate_assignment, 
+    llm_questions_extraction,
+    generate_practice_paper
+)
+from services.extractor import extract_text_from_pdf, clean_text
+from services.pdf_maker import generate_pdf
 import tempfile
 import os
 import logging
 from typing import Dict, List, Literal, Optional
 
 from database import Base, engine, get_db
-from models import User, Category, Class, Subject, Material, Notification
-from pyq_clustring import cluster_questions
+from models import (
+    User, Category, Class, Subject, Material, Notification,
+    University, Degree, Branch, Year, UniversitySubject, UniversityMaterial
+)
+from services.pyq_clustring import cluster_questions
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -249,7 +259,6 @@ async def generate_pdf_endpoint(payload: PDFRequest):
             temp_pdf_path = tmp.name
             
         # Generate PDF using the helper function
-        from pdf_maker import generate_pdf
         generate_pdf(payload.clusters, temp_pdf_path)
         
         # Return the file as a downloadable response
@@ -432,8 +441,6 @@ async def generate_student_practice_paper(
 ):
     """Generate practice paper for students based on selected syllabus units"""
     try:
-        from llm_smart_extractor import generate_practice_paper
-        
         # Check trial limit for students
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
@@ -977,14 +984,10 @@ async def delete_material(
 
 class UniversityCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
-    icon_name: Optional[str] = None
     display_order: int = Field(default=0)
 
 class UniversityUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    icon_name: Optional[str] = None
     display_order: Optional[int] = None
 
 class DegreeCreate(BaseModel):
@@ -1027,13 +1030,41 @@ class SemesterUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=50)
     display_order: Optional[int] = None
 
+class UniversitySubjectCreate(BaseModel):
+    year_id: int
+    name: str = Field(..., min_length=1, max_length=255)
+    icon_name: Optional[str] = None
+    display_order: int = Field(default=0)
+
+class UniversitySubjectUpdate(BaseModel):
+    year_id: Optional[int] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    icon_name: Optional[str] = None
+    display_order: Optional[int] = None
+
+class UniversityMaterialCreate(BaseModel):
+    uni_subject_id: int
+    material_type: str = Field(..., min_length=1, max_length=50)
+    title: str = Field(..., min_length=1, max_length=255)
+    year: Optional[str] = None
+    embed_url: Optional[str] = None
+    download_url: Optional[str] = None
+    display_order: int = Field(default=0)
+
+class UniversityMaterialUpdate(BaseModel):
+    uni_subject_id: Optional[int] = None
+    material_type: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    title: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    year: Optional[str] = None
+    embed_url: Optional[str] = None
+    download_url: Optional[str] = None
+    display_order: Optional[int] = None
+
 # Response Models
 
 class UniversityResponse(BaseModel):
     id: int
     name: str
-    description: Optional[str]
-    icon_name: Optional[str]
     display_order: int
 
     class Config:
@@ -1075,173 +1106,306 @@ class SemesterResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class UniversitySubjectResponse(BaseModel):
+    id: int
+    year_id: int
+    name: str
+    icon_name: Optional[str]
+    display_order: int
+
+    class Config:
+        from_attributes = True
+
+class UniversityMaterialResponse(BaseModel):
+    id: int
+    uni_subject_id: int
+    material_type: str
+    title: str
+    year: Optional[str]
+    embed_url: Optional[str]
+    download_url: Optional[str]
+    display_order: int
+
+    class Config:
+        from_attributes = True
+
 
 # --- University CRUD ---
 
-# @app.get("/api/universities", response_model=List[UniversityResponse])
-# def get_universities(response: Response, db: Session = Depends(get_db)):
-#     universities = db.query(University).order_by(University.display_order).all()
-#     response.headers["Cache-Control"] = "public, max-age=300"
-#     return universities
+@app.get("/api/universities", response_model=List[UniversityResponse])
+def get_universities(response: Response, db: Session = Depends(get_db)):
+    universities = db.query(University).order_by(University.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return universities
 
-# @app.post("/admin/universities", response_model=UniversityResponse, status_code=201)
-# def create_university(payload: UniversityCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     uni = University(**payload.model_dump())
-#     db.add(uni)
-#     try:
-#         db.commit()
-#     except IntegrityError:
-#         db.rollback()
-#         raise HTTPException(status_code=400, detail="University with this name already exists")
-#     db.refresh(uni)
-#     return uni
+@app.post("/admin/universities", response_model=UniversityResponse, status_code=201)
+def create_university(payload: UniversityCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    uni = University(**payload.model_dump())
+    db.add(uni)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="University with this name already exists")
+    db.refresh(uni)
+    return uni
 
-# @app.put("/admin/universities/{uni_id}", response_model=UniversityResponse)
-# def update_university(uni_id: int, payload: UniversityUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     uni = db.query(University).filter(University.id == uni_id).first()
-#     if not uni:
-#         raise HTTPException(status_code=404, detail="University not found")
+@app.put("/admin/universities/{uni_id}", response_model=UniversityResponse)
+def update_university(uni_id: int, payload: UniversityUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    uni = db.query(University).filter(University.id == uni_id).first()
+    if not uni:
+        raise HTTPException(status_code=404, detail="University not found")
     
-#     update_data = payload.model_dump(exclude_unset=True)
-#     for key, value in update_data.items():
-#         setattr(uni, key, value)
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(uni, key, value)
     
-#     try:
-#         db.commit()
-#     except IntegrityError:
-#         db.rollback()
-#         raise HTTPException(status_code=400, detail="University name conflict")
-#     db.refresh(uni)
-#     return uni
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="University name conflict")
+    db.refresh(uni)
+    return uni
 
-# @app.delete("/admin/universities/{uni_id}", status_code=204)
-# def delete_university(uni_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     uni = db.query(University).filter(University.id == uni_id).first()
-#     if not uni:
-#         raise HTTPException(status_code=404, detail="University not found")
-#     db.delete(uni)
-#     db.commit()
-#     return None
+@app.delete("/admin/universities/{uni_id}", status_code=204)
+def delete_university(uni_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    uni = db.query(University).filter(University.id == uni_id).first()
+    if not uni:
+        raise HTTPException(status_code=404, detail="University not found")
+    db.delete(uni)
+    db.commit()
+    return None
 
 
-# # --- Degree CRUD ---
+# --- Degree CRUD ---
 
-# @app.get("/api/universities/{university_id}/degrees", response_model=List[DegreeResponse])
-# def get_degrees(university_id: int, response: Response, db: Session = Depends(get_db)):
-#     degrees = db.query(Degree).filter(Degree.university_id == university_id).order_by(Degree.display_order).all()
-#     response.headers["Cache-Control"] = "public, max-age=300"
-#     return degrees
+@app.get("/admin/degrees", response_model=List[DegreeResponse])
+def get_all_degrees(response: Response, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    degrees = db.query(Degree).order_by(Degree.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return degrees
 
-# @app.post("/admin/degrees", response_model=DegreeResponse, status_code=201)
-# def create_degree(payload: DegreeCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     degree = Degree(**payload.model_dump())
-#     db.add(degree)
-#     db.commit()
-#     db.refresh(degree)
-#     return degree
+@app.get("/api/universities/{university_id}/degrees", response_model=List[DegreeResponse])
+def get_degrees(university_id: int, response: Response, db: Session = Depends(get_db)):
+    degrees = db.query(Degree).filter(Degree.university_id == university_id).order_by(Degree.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return degrees
 
-# @app.put("/admin/degrees/{degree_id}", response_model=DegreeResponse)
-# def update_degree(degree_id: int, payload: DegreeUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     degree = db.query(Degree).filter(Degree.id == degree_id).first()
-#     if not degree:
-#         raise HTTPException(status_code=404, detail="Degree not found")
+@app.post("/admin/degrees", response_model=DegreeResponse, status_code=201)
+def create_degree(payload: DegreeCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    degree = Degree(**payload.model_dump())
+    db.add(degree)
+    db.commit()
+    db.refresh(degree)
+    return degree
+
+@app.put("/admin/degrees/{degree_id}", response_model=DegreeResponse)
+def update_degree(degree_id: int, payload: DegreeUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    degree = db.query(Degree).filter(Degree.id == degree_id).first()
+    if not degree:
+        raise HTTPException(status_code=404, detail="Degree not found")
     
-#     update_data = payload.model_dump(exclude_unset=True)
-#     for key, value in update_data.items():
-#         setattr(degree, key, value)
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(degree, key, value)
     
-#     db.commit()
-#     db.refresh(degree)
-#     return degree
+    db.commit()
+    db.refresh(degree)
+    return degree
 
-# @app.delete("/admin/degrees/{degree_id}", status_code=204)
-# def delete_degree(degree_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     degree = db.query(Degree).filter(Degree.id == degree_id).first()
-#     if not degree:
-#         raise HTTPException(status_code=404, detail="Degree not found")
-#     db.delete(degree)
-#     db.commit()
-#     return None
+@app.delete("/admin/degrees/{degree_id}", status_code=204)
+def delete_degree(degree_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    degree = db.query(Degree).filter(Degree.id == degree_id).first()
+    if not degree:
+        raise HTTPException(status_code=404, detail="Degree not found")
+    db.delete(degree)
+    db.commit()
+    return None
 
 
-# # --- Branch CRUD ---
+# --- Branch CRUD ---
 
-# @app.get("/api/degrees/{degree_id}/branches", response_model=List[BranchResponse])
-# def get_branches(degree_id: int, response: Response, db: Session = Depends(get_db)):
-#     branches = db.query(Branch).filter(Branch.degree_id == degree_id).order_by(Branch.display_order).all()
-#     response.headers["Cache-Control"] = "public, max-age=300"
-#     return branches
+@app.get("/admin/branches", response_model=List[BranchResponse])
+def get_all_branches(response: Response, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    branches = db.query(Branch).order_by(Branch.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return branches
 
-# @app.post("/admin/branches", response_model=BranchResponse, status_code=201)
-# def create_branch(payload: BranchCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     branch = Branch(**payload.model_dump())
-#     db.add(branch)
-#     db.commit()
-#     db.refresh(branch)
-#     return branch
+@app.get("/api/degrees/{degree_id}/branches", response_model=List[BranchResponse])
+def get_branches(degree_id: int, response: Response, db: Session = Depends(get_db)):
+    branches = db.query(Branch).filter(Branch.degree_id == degree_id).order_by(Branch.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return branches
 
-# @app.put("/admin/branches/{branch_id}", response_model=BranchResponse)
-# def update_branch(branch_id: int, payload: BranchUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     branch = db.query(Branch).filter(Branch.id == branch_id).first()
-#     if not branch:
-#         raise HTTPException(status_code=404, detail="Branch not found")
+@app.post("/admin/branches", response_model=BranchResponse, status_code=201)
+def create_branch(payload: BranchCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    branch = Branch(**payload.model_dump())
+    db.add(branch)
+    db.commit()
+    db.refresh(branch)
+    return branch
+
+@app.put("/admin/branches/{branch_id}", response_model=BranchResponse)
+def update_branch(branch_id: int, payload: BranchUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
     
-#     update_data = payload.model_dump(exclude_unset=True)
-#     for key, value in update_data.items():
-#         setattr(branch, key, value)
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(branch, key, value)
     
-#     db.commit()
-#     db.refresh(branch)
-#     return branch
+    db.commit()
+    db.refresh(branch)
+    return branch
 
-# @app.delete("/admin/branches/{branch_id}", status_code=204)
-# def delete_branch(branch_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     branch = db.query(Branch).filter(Branch.id == branch_id).first()
-#     if not branch:
-#         raise HTTPException(status_code=404, detail="Branch not found")
-#     db.delete(branch)
-#     db.commit()
-#     return None
+@app.delete("/admin/branches/{branch_id}", status_code=204)
+def delete_branch(branch_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    db.delete(branch)
+    db.commit()
+    return None
 
 
-# # --- Year CRUD ---
+# --- Year CRUD ---
 
-# @app.get("/api/branches/{branch_id}/years", response_model=List[YearResponse])
-# def get_years(branch_id: int, response: Response, db: Session = Depends(get_db)):
-#     years = db.query(Year).filter(Year.branch_id == branch_id).order_by(Year.display_order).all()
-#     response.headers["Cache-Control"] = "public, max-age=300"
-#     return years
+@app.get("/admin/years", response_model=List[YearResponse])
+def get_all_years(response: Response, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    years = db.query(Year).order_by(Year.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return years
 
-# @app.post("/admin/years", response_model=YearResponse, status_code=201)
-# def create_year(payload: YearCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     year = Year(**payload.model_dump())
-#     db.add(year)
-#     db.commit()
-#     db.refresh(year)
-#     return year
+@app.get("/api/branches/{branch_id}/years", response_model=List[YearResponse])
+def get_years(branch_id: int, response: Response, db: Session = Depends(get_db)):
+    years = db.query(Year).filter(Year.branch_id == branch_id).order_by(Year.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return years
 
-# @app.put("/admin/years/{year_id}", response_model=YearResponse)
-# def update_year(year_id: int, payload: YearUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     year = db.query(Year).filter(Year.id == year_id).first()
-#     if not year:
-#         raise HTTPException(status_code=404, detail="Year not found")
+@app.post("/admin/years", response_model=YearResponse, status_code=201)
+def create_year(payload: YearCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    year = Year(**payload.model_dump())
+    db.add(year)
+    db.commit()
+    db.refresh(year)
+    return year
+
+@app.put("/admin/years/{year_id}", response_model=YearResponse)
+def update_year(year_id: int, payload: YearUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    year = db.query(Year).filter(Year.id == year_id).first()
+    if not year:
+        raise HTTPException(status_code=404, detail="Year not found")
     
-#     update_data = payload.model_dump(exclude_unset=True)
-#     for key, value in update_data.items():
-#         setattr(year, key, value)
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(year, key, value)
     
-#     db.commit()
-#     db.refresh(year)
-#     return year
+    db.commit()
+    db.refresh(year)
+    return year
 
-# @app.delete("/admin/years/{year_id}", status_code=204)
-# def delete_year(year_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-#     year = db.query(Year).filter(Year.id == year_id).first()
-#     if not year:
-#         raise HTTPException(status_code=404, detail="Year not found")
-#     db.delete(year)
-#     db.commit()
-#     return None
+@app.delete("/admin/years/{year_id}", status_code=204)
+def delete_year(year_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    year = db.query(Year).filter(Year.id == year_id).first()
+    if not year:
+        raise HTTPException(status_code=404, detail="Year not found")
+    db.delete(year)
+    db.commit()
+    return None
+
+
+# --- UniversitySubject CRUD ---
+
+@app.get("/admin/university-subjects", response_model=List[UniversitySubjectResponse])
+def get_all_university_subjects(response: Response, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    subjects = db.query(UniversitySubject).order_by(UniversitySubject.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return subjects
+
+@app.get("/api/years/{year_id}/university-subjects", response_model=List[UniversitySubjectResponse])
+def get_university_subjects(year_id: int, response: Response, db: Session = Depends(get_db)):
+    subjects = db.query(UniversitySubject).filter(UniversitySubject.year_id == year_id).order_by(UniversitySubject.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return subjects
+
+@app.post("/admin/university-subjects", response_model=UniversitySubjectResponse, status_code=201)
+def create_university_subject(payload: UniversitySubjectCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    subject = UniversitySubject(**payload.model_dump())
+    db.add(subject)
+    db.commit()
+    db.refresh(subject)
+    return subject
+
+@app.put("/admin/university-subjects/{subject_id}", response_model=UniversitySubjectResponse)
+def update_university_subject(subject_id: int, payload: UniversitySubjectUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    subject = db.query(UniversitySubject).filter(UniversitySubject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="University Subject not found")
+    
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(subject, key, value)
+    
+    db.commit()
+    db.refresh(subject)
+    return subject
+
+@app.delete("/admin/university-subjects/{subject_id}", status_code=204)
+def delete_university_subject(subject_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    subject = db.query(UniversitySubject).filter(UniversitySubject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="University Subject not found")
+    db.delete(subject)
+    db.commit()
+    return None
+
+
+# --- UniversityMaterial CRUD ---
+
+@app.get("/admin/university-materials", response_model=List[UniversityMaterialResponse])
+def get_all_university_materials(response: Response, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    materials = db.query(UniversityMaterial).order_by(UniversityMaterial.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return materials
+
+@app.get("/api/university-subjects/{subject_id}/materials", response_model=List[UniversityMaterialResponse])
+def get_university_materials(subject_id: int, response: Response, db: Session = Depends(get_db)):
+    materials = db.query(UniversityMaterial).filter(UniversityMaterial.uni_subject_id == subject_id).order_by(UniversityMaterial.display_order).all()
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return materials
+
+@app.post("/admin/university-materials", response_model=UniversityMaterialResponse, status_code=201)
+def create_university_material(payload: UniversityMaterialCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    material = UniversityMaterial(**payload.model_dump())
+    db.add(material)
+    db.commit()
+    db.refresh(material)
+    return material
+
+@app.put("/admin/university-materials/{material_id}", response_model=UniversityMaterialResponse)
+def update_university_material(material_id: int, payload: UniversityMaterialUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    material = db.query(UniversityMaterial).filter(UniversityMaterial.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="University Material not found")
+    
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(material, key, value)
+    
+    db.commit()
+    db.refresh(material)
+    return material
+
+@app.delete("/admin/university-materials/{material_id}", status_code=204)
+def delete_university_material(material_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    material = db.query(UniversityMaterial).filter(UniversityMaterial.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="University Material not found")
+    db.delete(material)
+    db.commit()
+    return None
 
 
 # # --- Semester CRUD ---
@@ -1308,6 +1472,13 @@ def get_public_categories(response: Response, db: Session = Depends(get_db)):
     ).order_by(Category.display_order).all()
     response.headers["Cache-Control"] = "public, max-age=300" # 5 minutes
     return categories
+
+
+@app.get("/universities")
+def get_universities(db: Session = Depends(get_db)):
+    from models import University
+    universities = db.query(University).order_by(University.display_order).all()
+    return universities
 
 
 @app.get("/api/classes/{class_id}", response_model=ClassWithSubjects)

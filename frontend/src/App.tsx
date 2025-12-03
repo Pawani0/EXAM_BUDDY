@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import School from "./pages/School";
+import University from "./pages/University";
 import Class from "./pages/Class";
 import Resources from "./pages/Resources";
 import Login from "./pages/Login";
@@ -18,8 +20,7 @@ import HotTopicsExtraction from "./pages/teacher/HotTopicsExtraction";
 import QuestionBankGenerator from "./pages/teacher/QuestionBankGenerator";
 import AssignmentGenerator from "./pages/teacher/AssignmentGenerator";
 import COPOMapping from "./pages/teacher/COPOMapping";
-import Admin from "./pages/Admin";
-import UniversityFlow from "./pages/UniversityFlow";
+import AdminPanel from "./pages/AdminPanel";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient({
@@ -41,6 +42,8 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/school" element={<School />} />
+          <Route path="/university" element={<University />} />
           <Route path="/class/:classId/:className" element={<Class />} />
           <Route path="/class/:classId" element={<Class />} />
           <Route path="/class/:classId/resources/:subject" element={<Resources />} />
@@ -122,7 +125,7 @@ const App = () => (
             path="/admin"
             element={
               <ProtectedRoute allowedRoles={["admin"]}>
-                <Admin />
+                <AdminPanel />
               </ProtectedRoute>
             }
           />

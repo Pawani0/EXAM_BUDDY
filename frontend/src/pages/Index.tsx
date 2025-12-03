@@ -1,33 +1,22 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { CategoryCard } from "@/components/CategoryCard";
 import { ThemeBackground } from "@/components/student/ThemeBackground";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, X, AlertCircle, Info, AlertTriangle } from "lucide-react";
+import { ChevronRight, X, AlertCircle, Info, AlertTriangle, School, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/useAuth";
-import { getIcon } from "@/lib/iconMapper";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useCategories, Category } from "@/hooks/useCategories";
 import { Zap, Target, Sparkles } from "lucide-react";
-
-import { Skeleton } from "@/components/ui/skeleton";
-import { useNotifications, Notification } from "@/hooks/useNotifications";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useNotifications } from "@/hooks/useNotifications";
 
 const Index = () => {
-  const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const { data: notifications = [] } = useNotifications();
-
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [dismissedNotifications, setDismissedNotifications] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
   const { user, clearUser } = useAuth();
   const isLoggedIn = Boolean(user);
-
-  if (categoriesError) {
-    toast.error("Failed to load categories");
-  }
 
   const handleDismissNotification = (id: number) => {
     setDismissedNotifications(prev => new Set([...prev, id]));
@@ -57,24 +46,11 @@ const Index = () => {
 
   const visibleNotifications = notifications.filter(n => !dismissedNotifications.has(n.id));
 
-
-
-  const handleCategoryClick = (category: Category) => {
-    setSelectedCategory(category);
-    toast.success("Category selected! Choose your class below.");
-  };
-
-  const handleClassClick = (classId: number, className: string) => {
-    navigate(`/class/${classId}/${className.toLowerCase().replace(/\s+/g, "-")}`);
-  };
-
   const handleLogout = () => {
     clearUser();
     toast.success("You have been logged out.");
     navigate("/login");
   };
-
-  const selectedCategoryData = selectedCategory ? categories.find((cat) => cat.id === selectedCategory.id) : null;
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -199,67 +175,48 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Categories Section */}
+      {/* School & University Selection */}
       <section id="categories" className="max-w-7xl mx-auto px-6 py-16 relative z-10">
         <div className="mb-12 animate-slide-up text-center">
           <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-            Choose Your Level
+            Choose Your Path
           </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">Select your category to access relevant study materials</p>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">Select your education level to access relevant study materials</p>
         </div>
 
-        {categoriesLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="glass-card p-6 rounded-2xl h-[200px] flex flex-col justify-between">
-                <div className="space-y-3">
-                  <Skeleton className="h-12 w-12 rounded-xl" />
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-full" />
-                </div>
+        <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-6">
+          <Card
+            className="cursor-pointer hover:shadow-lg transition-all duration-300 border-2 hover:border-primary hover:scale-[1.02]"
+            onClick={() => navigate("/school")}
+          >
+            <CardHeader className="text-center space-y-4 p-8">
+              <div className="mx-auto w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <School className="w-10 h-10 text-blue-600 dark:text-blue-400" />
               </div>
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-              {categories.map((category, index) => (
-                <CategoryCard
-                  key={category.id}
-                  title={category.title}
-                  description={category.description || ""}
-                  icon={getIcon(category.icon_name)}
-                  onClick={() => handleCategoryClick(category)}
-                  delay={index * 100}
-                />
-              ))}
-              {/* Universities feature temporarily removed */}
-            </div>
+              <CardTitle className="text-2xl">School</CardTitle>
+              <CardDescription className="text-base">
+                Resources for Primary, Middle, and Secondary School
+              </CardDescription>
+              <ChevronRight className="mx-auto w-6 h-6 text-muted-foreground" />
+            </CardHeader>
+          </Card>
 
-            {/* Classes Selection */}
-            {selectedCategory && selectedCategory.classes.length > 0 && (
-              <div className="p-8 animate-slide-up border-2 border-border/50 bg-background/80 backdrop-blur-xl rounded-3xl">
-                <h3 className="text-2xl font-bold text-foreground mb-6">
-                  Select Your Class - {selectedCategory.title}
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {selectedCategory.classes.map((classItem) => (
-                    <Button
-                      key={classItem.id}
-                      onClick={() => handleClassClick(classItem.id, classItem.name)}
-                      variant="outline"
-                      className="h-auto py-6 text-lg font-semibold hover:bg-primary/20 hover:border-primary transition-all duration-300"
-                    >
-                      {classItem.name}
-                    </Button>
-                  ))}
-                </div>
+          <Card
+            className="cursor-pointer hover:shadow-lg transition-all duration-300 border-2 hover:border-primary hover:scale-[1.02]"
+            onClick={() => navigate("/university")}
+          >
+            <CardHeader className="text-center space-y-4 p-8">
+              <div className="mx-auto w-20 h-20 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <GraduationCap className="w-10 h-10 text-purple-600 dark:text-purple-400" />
               </div>
-            )}
-          </>
-        )}
-
-
+              <CardTitle className="text-2xl">University</CardTitle>
+              <CardDescription className="text-base">
+                Resources for RGPV, Uni2, Uni3, and more
+              </CardDescription>
+              <ChevronRight className="mx-auto w-6 h-6 text-muted-foreground" />
+            </CardHeader>
+          </Card>
+        </div>
       </section>
 
       {/* Features Section */}

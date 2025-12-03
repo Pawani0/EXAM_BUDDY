@@ -539,11 +539,12 @@ const Admin = () => {
         <Card className="border-2 border-border/50 bg-background/80 backdrop-blur-xl">
           <CardContent className="pt-6">
             <Tabs defaultValue="categories" className="w-full">
-              <TabsList className="grid w-full grid-cols-5 mb-6">
+              <TabsList className="grid w-full grid-cols-6 mb-6">
                 <TabsTrigger value="categories">Categories</TabsTrigger>
                 <TabsTrigger value="classes">Classes</TabsTrigger>
                 <TabsTrigger value="subjects">Subjects</TabsTrigger>
                 <TabsTrigger value="materials">Materials</TabsTrigger>
+                <TabsTrigger value="universities">Universities</TabsTrigger>
                 <TabsTrigger value="notifications">Notifications</TabsTrigger>
               </TabsList>
 
@@ -1424,6 +1425,23 @@ const Admin = () => {
                     <p className="text-center text-muted-foreground py-8">No notifications yet. Create one to get started!</p>
                   )}
                 </div>
+              </TabsContent>
+
+              {/* Universities Tab */}
+              <TabsContent value="universities" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>University Management</CardTitle>
+                    <CardDescription>Manage universities, degrees, branches, years, and subjects</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground text-center py-8">
+                      University management interface will be available soon. 
+                      <br />
+                      This will include full CRUD operations for Universities → Degrees → Branches → Years → Subjects → Materials.
+                    </p>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </CardContent>
