@@ -172,8 +172,12 @@ def cluster_questions(syllabus_json: list, questions_list: list, threshold: floa
         except Exception as e:
             logging.error(f"Error calculating importance: {str(e)}")
             importance = {}
-    
-    # Sort importance by count descending
-    importance = dict(sorted(importance.items(), key=lambda item: item[1], reverse=True))
+        
+        # Sort importance by count descending
+        importance = dict(sorted(importance.items(), key=lambda item: item[1], reverse=True))
 
-    return clustered, importance
+        return clustered, importance
+    
+    except Exception as e:
+        logging.error(f"Unexpected error in cluster_questions: {str(e)}")
+        raise
