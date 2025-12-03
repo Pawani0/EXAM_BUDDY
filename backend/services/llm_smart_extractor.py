@@ -3,9 +3,19 @@ import os
 import json
 from groq import Groq
 import re
+import logging
 
 load_dotenv()
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+try:
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        logging.error("GROQ_API_KEY not found in environment variables")
+        raise ValueError("GROQ_API_KEY is required")
+    client = Groq(api_key=api_key)
+except Exception as e:
+    logging.error(f"Error initializing Groq client: {str(e)}")
+    raise
 
 STOPWORDS = [
     "book", "books", "textbook", "reference", "references",
@@ -15,6 +25,11 @@ STOPWORDS = [
 ]
 
 def llm_syllabus_extraction(syllabus):
+    """Extract structured syllabus units from text. Returns empty list on failure."""
+    if not syllabus or not syllabus.strip():
+        logging.warning("Empty syllabus provided to llm_syllabus_extraction")
+        return []
+        
     prompt = f"""
     You are given the academic syllabus.
 
@@ -55,27 +70,42 @@ def llm_syllabus_extraction(syllabus):
         response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0
+            temperature=0,
+            timeout=30
         )
 
         raw_content = response.choices[0].message.content.strip()
 
         if not raw_content:
-            raise ValueError("LLM returned empty response")
+            logging.error("LLM returned empty response for syllabus extraction")
+            return []
 
         # Attempt to extract a JSON array from any extra text
         match = re.search(r"\[.*\]", raw_content, re.DOTALL)
         if match:
             extracted = json.loads(match.group())
+            if not isinstance(extracted, list):
+                logging.error("LLM response is not a list")
+                return []
+            logging.info(f"Successfully extracted {len(extracted)} syllabus units")
             return extracted
         else:
-            raise ValueError("No valid JSON found in LLM response")
+            logging.error("No valid JSON array found in LLM response")
+            return []
 
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON decode error in syllabus extraction: {str(e)}")
+        return []
     except Exception as e:
-        print("Error in syllabus extraction:", str(e))
+        logging.error(f"Error in syllabus extraction: {str(e)}")
         return []
     
 def llm_questions_extraction(text):
+    """Extract questions from exam paper text. Returns empty list on failure."""
+    if not text or not text.strip():
+        logging.warning("Empty text provided to llm_questions_extraction")
+        return []
+        
     prompt = f"""You are an exam question extractor.
 
 Task:
@@ -96,14 +126,29 @@ Text:
         response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0
+            temperature=0,
+            timeout=30
         )
 
-        extracted = json.loads(response.choices[0].message.content)
+        raw_content = response.choices[0].message.content.strip()
+        if not raw_content:
+            logging.error("LLM returned empty response for questions extraction")
+            return []
 
+        extracted = json.loads(raw_content)
+        
+        if not isinstance(extracted, list):
+            logging.error("LLM response is not a list for questions extraction")
+            return []
+            
+        logging.info(f"Successfully extracted {len(extracted)} questions")
         return extracted
 
-    except Exception:
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON decode error in questions extraction: {str(e)}")
+        return []
+    except Exception as e:
+        logging.error(f"Error in questions extraction: {str(e)}")
         return []
     
 def classify_questions_llm_batch(questions: list, topic_list: list) -> dict:

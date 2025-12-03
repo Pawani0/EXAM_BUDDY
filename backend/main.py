@@ -109,108 +109,194 @@ async def get_current_admin(
 
 @app.post("/extract_syllabus/")
 async def extract_syllabus(file: UploadFile = File(...)):
-    if file.content_type != "application/pdf":
-        return JSONResponse(content={"error": "Only PDF files are allowed"}, status_code=400)
-
     temp_file_path = None
     try:
+        if file.content_type != "application/pdf":
+            return JSONResponse(content={"error": "Only PDF files are allowed"}, status_code=400)
+
         # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(await file.read())
-            temp_file_path = tmp.name
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                content = await file.read()
+                if not content:
+                    return JSONResponse(content={"error": "Empty file uploaded"}, status_code=400)
+                tmp.write(content)
+                temp_file_path = tmp.name
+        except Exception as e:
+            logging.error("Error saving uploaded file: %s", str(e))
+            return JSONResponse(content={"error": "Failed to process uploaded file"}, status_code=500)
 
         # Extract raw text
-        syllabus = extract_text_from_pdf(temp_file_path)
-        if not syllabus.strip():
-            return JSONResponse(content={"error": "Could not extract text from PDF"}, status_code=422)
+        try:
+            syllabus = extract_text_from_pdf(temp_file_path)
+            if not syllabus or not syllabus.strip():
+                return JSONResponse(content={"error": "Could not extract text from PDF. The file may be corrupted or image-based."}, status_code=422)
+        except Exception as e:
+            logging.error("Error extracting text from PDF: %s", str(e))
+            return JSONResponse(content={"error": "Failed to extract text from PDF"}, status_code=500)
 
         # Clean text & extract structured syllabus
-        cleaned_syllabus = clean_text(syllabus)
-        extracted_units = ext_syll(cleaned_syllabus)
-
-        logging.info("Extraction successful: %s", extracted_units)
-        
-        return JSONResponse(content=extracted_units, status_code=200)
+        try:
+            cleaned_syllabus = clean_text(syllabus)
+            extracted_units = ext_syll(cleaned_syllabus)
+            
+            if not extracted_units:
+                return JSONResponse(content={"error": "Could not identify syllabus structure"}, status_code=422)
+            
+            logging.info("Extraction successful: %d units found", len(extracted_units))
+            return JSONResponse(content=extracted_units, status_code=200)
+        except Exception as e:
+            logging.error("Error processing syllabus structure: %s", str(e))
+            return JSONResponse(content={"error": "Failed to analyze syllabus structure"}, status_code=500)
 
     except Exception as e:
-        logging.error("Error in extraction: %s", str(e))
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        logging.error("Unexpected error in extract_syllabus: %s", str(e))
+        return JSONResponse(content={"error": "An unexpected error occurred"}, status_code=500)
 
     finally:
         if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+            try:
+                os.remove(temp_file_path)
+            except Exception as e:
+                logging.warning("Failed to cleanup temp file %s: %s", temp_file_path, str(e))
 
 
 @app.post("/extract_questions/")
 async def extract_questions(file: UploadFile = File(...)):
     """Extract questions from a PYQ PDF file."""
-    if file.content_type != "application/pdf":
-        return JSONResponse(content={"error": "Only PDF files are allowed"}, status_code=400)
-
     temp_file_path = None
     try:
+        if file.content_type != "application/pdf":
+            return JSONResponse(content={"error": "Only PDF files are allowed"}, status_code=400)
+
         # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(await file.read())
-            temp_file_path = tmp.name
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                content = await file.read()
+                if not content:
+                    return JSONResponse(content={"error": "Empty file uploaded"}, status_code=400)
+                tmp.write(content)
+                temp_file_path = tmp.name
+        except Exception as e:
+            logging.error("Error saving uploaded file: %s", str(e))
+            return JSONResponse(content={"error": "Failed to process uploaded file"}, status_code=500)
 
         # Extract raw text
-        raw_text = extract_text_from_pdf(temp_file_path)
-        if not raw_text.strip():
-            return JSONResponse(content={"error": "Could not extract text from PDF"}, status_code=422)
+        try:
+            raw_text = extract_text_from_pdf(temp_file_path)
+            if not raw_text or not raw_text.strip():
+                return JSONResponse(content={"error": "Could not extract text from PDF. The file may be corrupted or image-based."}, status_code=422)
+        except Exception as e:
+            logging.error("Error extracting text from PDF: %s", str(e))
+            return JSONResponse(content={"error": "Failed to extract text from PDF"}, status_code=500)
 
         # Extract questions using LLM
-        questions = llm_questions_extraction(raw_text)
-
-        logging.info("Extracted %d questions", len(questions))
-        
-        return JSONResponse(content={"questions": questions}, status_code=200)
+        try:
+            questions = llm_questions_extraction(raw_text)
+            
+            if not questions:
+                return JSONResponse(content={"error": "No questions could be identified in the PDF"}, status_code=422)
+            
+            logging.info("Extracted %d questions", len(questions))
+            return JSONResponse(content={"questions": questions}, status_code=200)
+        except Exception as e:
+            logging.error("Error extracting questions with LLM: %s", str(e))
+            return JSONResponse(content={"error": "Failed to analyze questions from the PDF"}, status_code=500)
 
     except Exception as e:
-        logging.error("Error in question extraction: %s", str(e))
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        logging.error("Unexpected error in extract_questions: %s", str(e))
+        return JSONResponse(content={"error": "An unexpected error occurred"}, status_code=500)
 
     finally:
         if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+            try:
+                os.remove(temp_file_path)
+            except Exception as e:
+                logging.warning("Failed to cleanup temp file %s: %s", temp_file_path, str(e))
 
 
 @app.post("/auth/signup", response_model=UserResponse, status_code=201)
 def signup_user(payload: SignupRequest, db: Session = Depends(get_db)):
-    normalized_email = payload.email.lower()
-
-    existing_user = db.query(User).filter(User.email == normalized_email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="An account with this email already exists.")
-
-    new_user = User(
-        full_name=payload.full_name.strip(),
-        email=normalized_email,
-        password_hash=pwd_context.hash(payload.password),
-        role=payload.role,
-    )
-
-    db.add(new_user)
-
     try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="An account with this email already exists.")
+        normalized_email = payload.email.lower()
 
-    db.refresh(new_user)
-    return UserResponse.model_validate(new_user)
+        # Check for existing user
+        try:
+            existing_user = db.query(User).filter(User.email == normalized_email).first()
+            if existing_user:
+                raise HTTPException(status_code=400, detail="An account with this email already exists.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Database error checking existing user: %s", str(e))
+            raise HTTPException(status_code=500, detail="Database error occurred")
+
+        # Create new user
+        try:
+            new_user = User(
+                full_name=payload.full_name.strip(),
+                email=normalized_email,
+                password_hash=pwd_context.hash(payload.password),
+                role=payload.role,
+            )
+        except Exception as e:
+            logging.error("Error creating user object: %s", str(e))
+            raise HTTPException(status_code=500, detail="Failed to create user account")
+
+        db.add(new_user)
+
+        try:
+            db.commit()
+            db.refresh(new_user)
+            logging.info("New user created: %s", normalized_email)
+            return UserResponse.model_validate(new_user)
+        except IntegrityError as e:
+            db.rollback()
+            logging.warning("Integrity error during signup: %s", str(e))
+            raise HTTPException(status_code=400, detail="An account with this email already exists.")
+        except Exception as e:
+            db.rollback()
+            logging.error("Database error during signup: %s", str(e))
+            raise HTTPException(status_code=500, detail="Failed to create account")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error("Unexpected error in signup: %s", str(e))
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 @app.post("/auth/login", response_model=UserResponse)
 def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
-    normalized_email = payload.email.lower()
-    user = db.query(User).filter(User.email == normalized_email).first()
+    try:
+        normalized_email = payload.email.lower()
+        
+        # Query user from database
+        try:
+            user = db.query(User).filter(User.email == normalized_email).first()
+        except Exception as e:
+            logging.error("Database error during login query: %s", str(e))
+            raise HTTPException(status_code=500, detail="Database error occurred")
 
-    if not user or not pwd_context.verify(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid email or password.")
+        # Verify credentials
+        try:
+            if not user or not pwd_context.verify(payload.password, user.password_hash):
+                logging.warning("Failed login attempt for email: %s", normalized_email)
+                raise HTTPException(status_code=401, detail="Invalid email or password.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Error verifying password: %s", str(e))
+            raise HTTPException(status_code=500, detail="Authentication error occurred")
 
-    return UserResponse.model_validate(user)
+        logging.info("Successful login: %s", normalized_email)
+        return UserResponse.model_validate(user)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error("Unexpected error in login: %s", str(e))
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 @app.get("/users/{user_id}", response_model=UserResponse)
@@ -224,26 +310,47 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 
 @app.post("/pyq/cluster", response_model=ClusterResponse)
 def cluster_pyq_questions(payload: ClusterRequest):
-    if not payload.syllabus:
-        raise HTTPException(status_code=400, detail="Syllabus data is required for clustering.")
-
-    if not payload.questions:
-        raise HTTPException(status_code=400, detail="Please provide at least one question to cluster.")
-
-    questions = [q.strip() for q in payload.questions if q.strip()]
-    if not questions:
-        raise HTTPException(status_code=400, detail="Please provide at least one valid question to cluster.")
-
-    syllabus_payload = [unit.model_dump() for unit in payload.syllabus]
-
     try:
-        threshold = payload.threshold if payload.threshold is not None else 0.65
-        clusters, importance = cluster_questions(syllabus_payload, questions, threshold)
-    except Exception as exc:
-        logging.error("Failed to cluster PYQ questions: %s", exc)
-        raise HTTPException(status_code=500, detail="Unable to cluster questions right now. Please try again later.")
+        # Validate input
+        if not payload.syllabus:
+            raise HTTPException(status_code=400, detail="Syllabus data is required for clustering.")
 
-    return ClusterResponse(clusters=clusters, importance=importance)
+        if not payload.questions:
+            raise HTTPException(status_code=400, detail="Please provide at least one question to cluster.")
+
+        questions = [q.strip() for q in payload.questions if q.strip()]
+        if not questions:
+            raise HTTPException(status_code=400, detail="Please provide at least one valid question to cluster.")
+
+        # Prepare syllabus data
+        try:
+            syllabus_payload = [unit.model_dump() for unit in payload.syllabus]
+        except Exception as e:
+            logging.error("Error preparing syllabus data: %s", str(e))
+            raise HTTPException(status_code=400, detail="Invalid syllabus data format")
+
+        # Perform clustering
+        try:
+            threshold = payload.threshold if payload.threshold is not None else 0.65
+            clusters, importance = cluster_questions(syllabus_payload, questions, threshold)
+            
+            if not clusters:
+                raise HTTPException(status_code=422, detail="Could not cluster questions. Please check your syllabus and questions.")
+                
+            logging.info("Successfully clustered %d questions into %d units", len(questions), len(clusters))
+            return ClusterResponse(clusters=clusters, importance=importance)
+            
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logging.error("Failed to cluster PYQ questions: %s", exc)
+            raise HTTPException(status_code=500, detail="Unable to cluster questions. Please try again later.")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error("Unexpected error in cluster_pyq_questions: %s", str(e))
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 class PDFRequest(BaseModel):
@@ -253,24 +360,58 @@ class PDFRequest(BaseModel):
 @app.post("/pyq/generate-pdf")
 async def generate_pdf_endpoint(payload: PDFRequest):
     """Generate a PDF from clustered questions."""
+    temp_pdf_path = None
     try:
+        # Validate input
+        if not payload.clusters:
+            raise HTTPException(status_code=400, detail="No clusters provided for PDF generation")
+        
         # Create a temporary file for the PDF
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            temp_pdf_path = tmp.name
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                temp_pdf_path = tmp.name
+        except Exception as e:
+            logging.error("Error creating temp PDF file: %s", str(e))
+            raise HTTPException(status_code=500, detail="Failed to create PDF file")
             
         # Generate PDF using the helper function
-        generate_pdf(payload.clusters, temp_pdf_path)
+        try:
+            generate_pdf(payload.clusters, temp_pdf_path)
+            
+            if not os.path.exists(temp_pdf_path):
+                raise Exception("PDF file was not created")
+                
+            logging.info("PDF generated successfully at %s", temp_pdf_path)
+        except Exception as e:
+            logging.error("Error generating PDF content: %s", str(e))
+            if temp_pdf_path and os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
+            raise HTTPException(status_code=500, detail="Failed to generate PDF content")
         
         # Return the file as a downloadable response
-        return FileResponse(
-            path=temp_pdf_path,
-            filename="Exam_Buddy_Clustered_Questions.pdf",
-            media_type="application/pdf",
-            background=BackgroundTask(lambda: os.remove(temp_pdf_path)) # Cleanup after sending
-        )
+        try:
+            return FileResponse(
+                path=temp_pdf_path,
+                filename="Exam_Buddy_Clustered_Questions.pdf",
+                media_type="application/pdf",
+                background=BackgroundTask(lambda: os.remove(temp_pdf_path) if os.path.exists(temp_pdf_path) else None)
+            )
+        except Exception as e:
+            logging.error("Error sending PDF response: %s", str(e))
+            if temp_pdf_path and os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
+            raise HTTPException(status_code=500, detail="Failed to send PDF file")
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        logging.error("Error generating PDF: %s", str(e))
-        raise HTTPException(status_code=500, detail="Failed to generate PDF")
+        logging.error("Unexpected error in generate_pdf_endpoint: %s", str(e))
+        if temp_pdf_path and os.path.exists(temp_pdf_path):
+            try:
+                os.remove(temp_pdf_path)
+            except:
+                pass
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 # ==================== TEACHER API ENDPOINTS ====================
@@ -310,30 +451,70 @@ async def extract_units_from_syllabus(
     db: Session = Depends(get_db)
 ):
     """Extract units and topics from syllabus PDF"""
+    temp_path = None
     try:
+        # Validate user
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Database error validating user: %s", str(e))
+            raise HTTPException(status_code=500, detail="Database error occurred")
+        
         # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-            content = await syllabus.read()
-            temp_file.write(content)
-            temp_path = temp_file.name
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                content = await syllabus.read()
+                if not content:
+                    raise HTTPException(status_code=400, detail="Empty file uploaded")
+                temp_file.write(content)
+                temp_path = temp_file.name
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Error saving uploaded file: %s", str(e))
+            raise HTTPException(status_code=500, detail="Failed to process uploaded file")
         
         # Extract text from PDF
-        text = extract_text_from_pdf(temp_path)
-        cleaned = clean_text(text)
+        try:
+            text = extract_text_from_pdf(temp_path)
+            if not text or not text.strip():
+                raise HTTPException(status_code=422, detail="Could not extract text from PDF")
+            cleaned = clean_text(text)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Error extracting text: %s", str(e))
+            raise HTTPException(status_code=500, detail="Failed to extract text from PDF")
         
         # Extract units using LLM
-        units = ext_syll(cleaned)
+        try:
+            units = ext_syll(cleaned)
+            if not units:
+                raise HTTPException(status_code=422, detail="Could not identify units in the syllabus")
+            
+            logging.info("Successfully extracted %d units for user %d", len(units), user_id)
+            return {"units": units}
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Error extracting units with LLM: %s", str(e))
+            raise HTTPException(status_code=500, detail="Failed to analyze syllabus structure")
         
-        # Clean up temp file
-        os.remove(temp_path)
-        
-        return {"units": units}
-        
+    except HTTPException:
+        raise
     except Exception as e:
-        logging.error("Error extracting units: %s", str(e))
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        raise HTTPException(status_code=500, detail=f"Failed to extract units: {str(e)}")
+        logging.error("Unexpected error in extract_units_from_syllabus: %s", str(e))
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception as e:
+                logging.warning("Failed to cleanup temp file %s: %s", temp_path, str(e))
 
 
 @app.post("/teacher/hot-topics")
@@ -491,24 +672,46 @@ async def create_question_bank(
 ):
     try:
         # Check trial limit
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            if user.role == "teacher" and (user.trial_used or 0) >= 3:
+                raise HTTPException(status_code=403, detail="Trial limit reached. Please upgrade your account.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Database error checking user: %s", str(e))
+            raise HTTPException(status_code=500, detail="Database error occurred")
         
-        if user.role == "teacher" and (user.trial_used or 0) >= 3:
-            raise HTTPException(status_code=403, detail="Trial limit reached")
-        
-        questions = generate_question_bank(payload.topics, payload.quantity, "Medium")
+        # Generate question bank
+        try:
+            questions = generate_question_bank(payload.topics, payload.quantity, "Medium")
+            
+            if not questions:
+                raise HTTPException(status_code=422, detail="Could not generate questions. Please try different topics.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Error generating question bank: %s", str(e))
+            raise HTTPException(status_code=500, detail="Failed to generate question bank")
         
         # Increment trial count
-        await increment_trial(user_id, db)
+        try:
+            await increment_trial(user_id, db)
+            logging.info("Generated %d questions for user %d", len(questions), user_id)
+        except Exception as e:
+            logging.error("Error incrementing trial count: %s", str(e))
+            # Don't fail the request if trial increment fails
         
         return {"questions": questions}
+        
     except HTTPException:
         raise
     except Exception as e:
-        logging.error("Error generating question bank: %s", str(e))
-        raise HTTPException(status_code=500, detail="Failed to generate question bank")
+        logging.error("Unexpected error in create_question_bank: %s", str(e))
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 @app.post("/teacher/assignment")
@@ -519,25 +722,57 @@ async def create_assignment(
 ):
     try:
         # Check trial limit
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            if user.role == "teacher" and (user.trial_used or 0) >= 3:
+                raise HTTPException(status_code=403, detail="Trial limit reached. Please upgrade your account.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Database error checking user: %s", str(e))
+            raise HTTPException(status_code=500, detail="Database error occurred")
         
-        if user.role == "teacher" and (user.trial_used or 0) >= 3:
-            raise HTTPException(status_code=403, detail="Trial limit reached")
+        # Parse and validate topics
+        try:
+            topics_list = [t.strip() for t in payload.topics.split(",") if t.strip()]
+            if not topics_list:
+                raise HTTPException(status_code=400, detail="Please provide at least one topic")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Error parsing topics: %s", str(e))
+            raise HTTPException(status_code=400, detail="Invalid topics format")
         
-        topics_list = [t.strip() for t in payload.topics.split(",")]
-        assignment = generate_assignment(topics_list, payload.blooms_level, [payload.question_types], payload.quantity)
+        # Generate assignment
+        try:
+            assignment = generate_assignment(topics_list, payload.blooms_level, [payload.question_types], payload.quantity)
+            
+            if not assignment:
+                raise HTTPException(status_code=422, detail="Could not generate assignment. Please try different parameters.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.error("Error generating assignment: %s", str(e))
+            raise HTTPException(status_code=500, detail="Failed to generate assignment")
         
         # Increment trial count
-        await increment_trial(user_id, db)
+        try:
+            await increment_trial(user_id, db)
+            logging.info("Generated assignment for user %d", user_id)
+        except Exception as e:
+            logging.error("Error incrementing trial count: %s", str(e))
+            # Don't fail the request if trial increment fails
         
         return assignment
+        
     except HTTPException:
         raise
     except Exception as e:
-        logging.error("Error generating assignment: %s", str(e))
-        raise HTTPException(status_code=500, detail="Failed to generate assignment")
+        logging.error("Unexpected error in create_assignment: %s", str(e))
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 # ==================== ADMIN API ENDPOINTS ====================

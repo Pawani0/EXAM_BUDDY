@@ -129,7 +129,6 @@ const App = () => (
               </ProtectedRoute>
             }
           />
-          <Route path="/university" element={<UniversityFlow />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
