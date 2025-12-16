@@ -1,6 +1,6 @@
 # 📚 Exam Buddy - AI-Powered Educational Platform
 
-**Exam Buddy** is a comprehensive educational platform that leverages AI and machine learning to help students, teachers, and administrators manage academic resources effectively. The platform supports both **School** and **University** educational hierarchies with intelligent features like practice paper generation, hot topic extraction, and question clustering.
+**Exam Buddy** is a comprehensive educational platform developed as a **Minor Project**. It leverages AI and machine learning to help students, teachers, and administrators manage academic resources effectively. The platform supports both **School** and **University** educational hierarchies with intelligent features like practice paper generation, hot topic extraction, and question clustering.
 
 ---
 
@@ -395,6 +395,13 @@ This project is licensed under the MIT License.
 ---
 
 ## 👥 Team
+
+This project was developed as a **Minor Project** by:
+
+- **Rishabh Pawani**
+- **Priyanka Vishwakarma**
+- **Nitin Rajput**
+- **Abdullah Arham**
 
 Developed with ❤️ by the Exam Buddy Team
 
