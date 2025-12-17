@@ -8,3 +8,6 @@ groq
 sentence-transformers
 scikit-learn
 numpy
+pytesseract
+Pillow
+pypdf2

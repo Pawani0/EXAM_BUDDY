@@ -36,6 +36,9 @@ services:
       # API Keys (set these in .env file)
       GROQ_API_KEY: ${GROQ_API_KEY}
       
+      # Tesseract OCR path
+      TESSERACT_CMD: /usr/bin/tesseract
+      
       # Application settings
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DEBUG: ${DEBUG:-true}

@@ -3,9 +3,21 @@ import pytesseract
 import fitz
 from PIL import Image
 import logging
+import os
+import platform
 from services.llm_smart_extractor import llm_questions_extraction as ext_ques, llm_syllabus_extraction as ext_syllabus
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# Set Tesseract path based on environment
+# Check environment variable first (for Docker), then use OS-specific defaults
+tesseract_cmd = os.getenv('TESSERACT_CMD')
+if not tesseract_cmd:
+    # Local development paths
+    if platform.system() == 'Windows':
+        tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    else:  # Linux/Mac
+        tesseract_cmd = '/usr/bin/tesseract'
+
+pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 
 def extract_text_from_pdf(pdf_path):
     """Extract text from PDF using OCR. Raises exception on failure."""
