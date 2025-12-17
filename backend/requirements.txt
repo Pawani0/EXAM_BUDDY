@@ -10,4 +10,5 @@ scikit-learn
 numpy
 pytesseract
 Pillow
-pypdf2
+PyMuPDF
+pydantic[email]
