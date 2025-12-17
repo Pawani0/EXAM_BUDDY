@@ -1,34 +1,28 @@
-# Web Framework
 fastapi
-uvicorn[standard]
-starlette
+uvicorn
 
-# Database
-sqlalchemy>=2.0
-psycopg[binary]
-
-# Security & Authentication
-passlib[bcrypt]
-
-# Configuration
+pydantic
 python-dotenv
 
-# AI/ML
-groq
-sentence-transformers
-scikit-learn
-numpy
+sqlalchemy
+psycopg2-binary
 
-# OCR & PDF Processing
+passlib[bcrypt]
+
+python-multipart
+email-validator
+
 pytesseract
-Pillow
+pillow
 PyMuPDF
 
-# PDF Generation
 reportlab
 
-# Data Validation
-pydantic[email]
+numpy
+scikit-learn
+sentence-transformers
 
-# HTTP Client (if needed)
-httpx
+groq
+
+starlette
+
