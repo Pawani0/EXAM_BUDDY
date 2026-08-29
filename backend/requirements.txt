@@ -15,7 +15,6 @@ email-validator
 
 pytesseract
 pillow
-pillow
 PyMuPDF
 
 reportlab
@@ -26,6 +25,4 @@ scikit-learn
 sentence-transformers
 
 groq
-
-starlette
 

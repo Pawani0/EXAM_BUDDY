@@ -29,7 +29,7 @@ COPY . .
 RUN mkdir -p diagrams scripts services __pycache__
 
 # Expose port
-EXPOSE 8008
+EXPOSE 8080
 
 # Command to run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8008", "--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
