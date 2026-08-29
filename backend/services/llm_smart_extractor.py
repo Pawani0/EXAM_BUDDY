@@ -24,6 +24,72 @@ STOPWORDS = [
     "syllabus", "recommended", "further reading"
 ]
 
+MAX_QUESTION_INPUT_CHARS = 50000
+
+
+def _extract_json_array(raw_content: str):
+    """Best-effort extraction of a JSON array from LLM output."""
+    if not raw_content:
+        return None
+
+    # Try direct parse first
+    try:
+        parsed = json.loads(raw_content)
+        if isinstance(parsed, list):
+            return parsed
+    except Exception:
+        pass
+
+    # Try extracting the outermost JSON array
+    first = raw_content.find("[")
+    last = raw_content.rfind("]")
+    if first != -1 and last != -1 and last > first:
+        candidate = raw_content[first:last + 1]
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, list):
+                return parsed
+        except Exception:
+            return None
+
+    return None
+
+
+def _repair_questions_json(raw_content: str):
+    """Ask LLM to repair malformed extraction output into strict JSON format."""
+    try:
+        repair_prompt = f"""
+You are a strict JSON fixer.
+
+Convert the following content into a valid JSON array.
+Each element must be an object with exactly these keys:
+- "question": plain question text
+- "latex": LaTex-safe question text
+
+Rules:
+- Return only valid JSON.
+- No markdown, no explanations.
+- Preserve content meaning.
+- If latex is missing, copy question into latex.
+
+Content:
+{raw_content}
+"""
+
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": repair_prompt}],
+            temperature=0,
+            timeout=30,
+            max_tokens=6000
+        )
+
+        repaired = response.choices[0].message.content.strip()
+        return _extract_json_array(repaired)
+    except Exception as e:
+        logging.error(f"Error repairing malformed question JSON: {str(e)}")
+        return None
+
 def llm_syllabus_extraction(syllabus):
     """Extract structured syllabus units from text. Returns empty list on failure."""
     if not syllabus or not syllabus.strip():
@@ -38,7 +104,8 @@ def llm_syllabus_extraction(syllabus):
 
     Task:
     - Extract ONLY the **unit topics**.
-    - Topics should be similar as in the syllabus.
+    - **CRITICAL**: Split combined topics (e.g., "A, B and C") into individual items. Do NOT group multiple concepts in one string.
+    - Topics should be granular and specific.
     - Also extract sub-topics if present.
     - Extract unit name as well; if no unit name is given, generate a suitable one.
     - Remove anything related to {', '.join(STOPWORDS)}.
@@ -51,7 +118,8 @@ def llm_syllabus_extraction(syllabus):
             "unit_name": "Introduction to Programming",
             "topics": [
                 "Basics of Programming",
-                "Data Types and Variables",
+                "Data Types",
+                "Variables",
                 "Control Structures"
             ]
         }},
@@ -59,8 +127,10 @@ def llm_syllabus_extraction(syllabus):
             "unit": "Unit 2",
             "unit_name": "Object-Oriented Programming",
             "topics": [
-                "Classes and Objects",
-                "Inheritance and Polymorphism"
+                "Classes",
+                "Objects",
+                "Inheritance",
+                "Polymorphism"
             ]
         }}
     ]
@@ -102,54 +172,113 @@ def llm_syllabus_extraction(syllabus):
     
 def llm_questions_extraction(text):
     """Extract questions from exam paper text. Returns empty list on failure."""
+    result = llm_questions_extraction_with_latex(text)
+    return result.get("questions", [])
+
+
+def llm_questions_extraction_with_latex(text):
+    """Extract questions and provide both plain text and LaTex form. Returns empty payload on failure."""
     if not text or not text.strip():
-        logging.warning("Empty text provided to llm_questions_extraction")
-        return []
+        logging.warning("Empty text provided to llm_questions_extraction_with_latex")
+        return {"questions": [], "questions_latex": []}
         
+    sanitized_text = text.strip()
+    if len(sanitized_text) > MAX_QUESTION_INPUT_CHARS:
+        logging.warning(
+            "Input too long for stable extraction (%d chars). Truncating to %d chars.",
+            len(sanitized_text),
+            MAX_QUESTION_INPUT_CHARS
+        )
+        sanitized_text = sanitized_text[:MAX_QUESTION_INPUT_CHARS]
+
     prompt = f"""You are an exam question extractor.
 
 Task:
 - Input: raw OCR text from a scanned exam paper.
-- Output: array of objects with only English questions.
+- Output: valid JSON array of objects, each with:
+    - "question": plain text question string
+    - "latex": LaTex-safe representation of the same question
+- Content to Extract:
+    1. Standard Questions (Descriptive, Numerical, etc.)
+    2. Multiple Choice Questions (MCQs) -> Format as: "Question Text? (a) Option1 (b) Option2 (c) Option3 (d) Option4"
+    3. Fill in the blanks -> Format as: "The capital of France is ______."
+    4. Match the following -> Format as: "Match: [A: Item1 -> 1: Match1], [B: Item2 -> 2: Match2]..." or preserve the full matching block as one string.
+    5. True/False -> Format as: "Question text? (True/False)"
+    
 - Remove: headers, footers, roll no, time, max marks, exam instructions, page numbers, and any Hindi text.
-- Keep: only full English questions (even if split across lines, merge them).
-- Note: In RGPV papers, there are 8 question that can have parts (a, b) consider them seprate questions.
-        If questions are like discuss or explain only 2 or 3 from the following then coonsider it as 1 question.
+- Merge split lines: Ensure each question is a single continuous string.
+- Handling Parts: 
+    - If a question has sub-parts like (a), (b), treat them as separate questions IF they are substantial. 
+    - For "Match the following", keep the entire set as ONE question entry.
+- LaTex rules:
+        - Keep full text meaning unchanged.
+        - Convert mathematical expressions to LaTex math mode using $...$.
+        - For fractions use \\frac{{a}}{{b}}, exponents use ^{{ }}, subscripts use _{{ }}.
+        - For matrices use \\begin{{bmatrix}} ... \\end{{bmatrix}}.
+        - Escape LaTex special characters in normal text where needed.
+        - If no math is present, keep latex close to readable text with minimal escaping.
 
 Format:
-["First question", "Second question", ...]
+[
+    {{"question": "Question 1...", "latex": "Question 1..."}},
+    {{"question": "Find determinant of matrix [[1,2],[3,4]]", "latex": "Find determinant of matrix $\\\\begin{{bmatrix}}1 & 2 \\\\ 3 & 4\\\\end{{bmatrix}}$"}}
+]
 
 Text:
-{text}"""
-    
+{sanitized_text}"""
+
     try:
         response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            timeout=30
+            timeout=30,
+            max_tokens=6000
         )
 
         raw_content = response.choices[0].message.content.strip()
         if not raw_content:
             logging.error("LLM returned empty response for questions extraction")
-            return []
+            return {"questions": [], "questions_latex": []}
 
-        extracted = json.loads(raw_content)
+        extracted = _extract_json_array(raw_content)
+        if extracted is None:
+            logging.warning("Primary question JSON parse failed. Attempting repair pass.")
+            extracted = _repair_questions_json(raw_content)
         
         if not isinstance(extracted, list):
-            logging.error("LLM response is not a list for questions extraction")
-            return []
-            
-        logging.info(f"Successfully extracted {len(extracted)} questions")
-        return extracted
+            logging.error("LLM response is not a list for questions extraction with LaTex")
+            return {"questions": [], "questions_latex": []}
+
+        questions = []
+        questions_latex = []
+
+        for item in extracted:
+            if isinstance(item, dict):
+                question_text = str(item.get("question", "")).strip()
+                question_latex = str(item.get("latex", "")).strip()
+            else:
+                question_text = str(item).strip()
+                question_latex = question_text
+
+            if not question_text:
+                continue
+
+            if not question_latex:
+                question_latex = question_text
+
+            questions.append(question_text)
+            questions_latex.append(question_latex)
+
+        logging.info(f"Successfully extracted {len(questions)} questions with LaTex")
+        return {"questions": questions, "questions_latex": questions_latex}
 
     except json.JSONDecodeError as e:
-        logging.error(f"JSON decode error in questions extraction: {str(e)}")
-        return []
+        logging.error(f"JSON decode error in questions extraction with LaTex: {str(e)}")
+        return {"questions": [], "questions_latex": []}
     except Exception as e:
-        logging.error(f"Error in questions extraction: {str(e)}")
-        return []
+        logging.error(f"Error in questions extraction with LaTex: {str(e)}")
+        return {"questions": [], "questions_latex": []}
     
 def classify_questions_llm_batch(questions: list, topic_list: list) -> dict:
     """
@@ -187,8 +316,12 @@ Return ONLY the JSON object. No explanations, no extra text.
 
         raw_output = response.choices[0].message.content.strip()
 
-        # Parse as JSON object
-        result = json.loads(raw_output)
+        # Parse as JSON object with regex fallback
+        match = re.search(r"\{.*\}", raw_output, re.DOTALL)
+        if match:
+            result = json.loads(match.group())
+        else:
+            result = json.loads(raw_output)
 
         # Cleanup: ensure dict structure
         cleaned = {}

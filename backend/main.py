@@ -13,6 +13,7 @@ from services.llm_smart_extractor import (
     generate_question_bank, 
     generate_assignment, 
     llm_questions_extraction,
+    llm_questions_extraction_with_latex,
     generate_practice_paper
 )
 from services.extractor import extract_text_from_pdf, clean_text
@@ -139,7 +140,8 @@ async def extract_syllabus(file: UploadFile = File(...)):
         try:
             cleaned_syllabus = clean_text(syllabus)
             extracted_units = ext_syll(cleaned_syllabus)
-            
+            print("cleaned_syllabus:", cleaned_syllabus)
+            print("extracted_units:", extracted_units)
             if not extracted_units:
                 return JSONResponse(content={"error": "Could not identify syllabus structure"}, status_code=422)
             
@@ -190,15 +192,21 @@ async def extract_questions(file: UploadFile = File(...)):
             logging.error("Error extracting text from PDF: %s", str(e))
             return JSONResponse(content={"error": "Failed to extract text from PDF"}, status_code=500)
 
-        # Extract questions using LLM
+        # Extract questions using LLM (plain + LaTex)
         try:
-            questions = llm_questions_extraction(raw_text)
-            
+            extraction_result = llm_questions_extraction_with_latex(raw_text)
+            questions = extraction_result.get("questions", [])
+            questions_latex = extraction_result.get("questions_latex", [])
+            print("raw_text:", raw_text)
+            print("extracted_questions:", questions)
             if not questions:
                 return JSONResponse(content={"error": "No questions could be identified in the PDF"}, status_code=422)
             
             logging.info("Extracted %d questions", len(questions))
-            return JSONResponse(content={"questions": questions}, status_code=200)
+            return JSONResponse(content={
+                "questions": questions,
+                "questions_latex": questions_latex
+            }, status_code=200)
         except Exception as e:
             logging.error("Error extracting questions with LLM: %s", str(e))
             return JSONResponse(content={"error": "Failed to analyze questions from the PDF"}, status_code=500)
