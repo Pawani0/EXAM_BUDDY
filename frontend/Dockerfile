@@ -14,8 +14,8 @@ RUN npm install -g bun && bun install
 COPY . .
 
 # Build the application
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 # ponytail: 1GB-RAM VM caps V8 heap below what vite needs; force it to use swap
 ENV NODE_OPTIONS=--max-old-space-size=2048
 RUN bun run build
