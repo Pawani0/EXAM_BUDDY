@@ -23,9 +23,6 @@ services:
       # Application settings
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DEBUG: ${DEBUG:-true}
-    volumes:
-      - ./backend:/app
-      - backend_cache:/app/__pycache__
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/universities"]
       interval: 30s
@@ -51,10 +48,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-volumes:
-  backend_cache:
-    driver: local
 
 networks:
   default:
