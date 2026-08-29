@@ -15,6 +15,7 @@ email-validator
 
 pytesseract
 pillow
+pillow
 PyMuPDF
 
 reportlab
