@@ -38,12 +38,12 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
     container_name: exam_buddy_frontend
     restart: always
     ports:
-      - "80:80"
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+      - "3000:80"
     depends_on:
       - backend
     healthcheck:

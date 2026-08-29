@@ -14,6 +14,8 @@ RUN npm install -g bun && bun install
 COPY . .
 
 # Build the application
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN bun run build
 
 # Production stage
